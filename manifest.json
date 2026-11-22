@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "AI Resume Tailor - ATS Optimizer",
+  "version": "1.0.0",
+  "description": "Tailor your resume to any job listing with free AI models directly from your browser. Privacy-first & ATS-ready.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "sidePanel"
+  ],
+  "action": {
+    "default_title": "Open AI Resume Tailor"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Resume Tailor</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-group">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">
+          <h1>AI Resume Tailor</h1>
+          <span class="subtext">ATS Optimization Engine</span>
+        </div>
+      </div>
+      <div id="profile-status-badge" class="badge badge-amber">No Profile Set</div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tab-nav">
+      <button class="nav-tab active" data-target="panel-tailor">
+        <span class="tab-icon">🚀</span> Tailor
+      </button>
+      <button class="nav-tab" data-target="panel-profile">
+        <span class="tab-icon">👤</span> Master Profile
+      </button>
+      <button class="nav-tab" data-target="panel-settings">
+        <span class="tab-icon">⚙️</span> Settings
+      </button>
+    </nav>
+
+    <!-- TAB 1: TAILOR -->
+    <main id="panel-tailor" class="tab-panel active">
+      <div class="card">
+        <div class="card-header">
+          <h2>Active Job Context</h2>
+          <button id="btn-fetch-job" class="btn-subtle" title="Re-scan active browser tab">↻ Scan Tab</button>
+        </div>
+        <div id="job-detection-status" class="status-text info">Scanning active webpage...</div>
+
+        <div class="form-group">
+          <label for="job-title">Job Title</label>
+          <input type="text" id="job-title" placeholder="e.g. Senior Software Developer (.NET)">
+        </div>
+
+        <div class="form-group">
+          <label for="job-company">Company</label>
+          <input type="text" id="job-company" placeholder="e.g. Acme Corp, TechCorp, Globex">
+        </div>
+
+        <div class="form-group">
+          <label for="job-description">Job Description & Requirements</label>
+          <textarea id="job-description" rows="5" placeholder="Job description will auto-populate from active tab, or paste it here manually..."></textarea>
+        </div>
+
+        <button id="btn-tailor" class="btn btn-primary full-width">
+          ✨ Tailor Resume with AI
+        </button>
+        <div id="tailor-status" class="status-container"></div>
+      </div>
+
+      <!-- Results Preview Card (Hidden until tailored) -->
+      <div id="results-card" class="card results-card" style="display: none;">
+        <div class="results-header">
+          <div class="score-container">
+            <span class="score-label">ATS Match</span>
+            <span id="match-score" class="score-badge">--%</span>
+          </div>
+          <div class="export-actions">
+            <button id="btn-download-pdf" class="btn btn-success btn-sm">📥 Download ATS PDF</button>
+            <button id="btn-download-md" class="btn btn-secondary btn-sm">📄 .md</button>
+            <button id="btn-copy-md" class="btn btn-subtle btn-sm">📋 Copy</button>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="results-section">
+          <h3>Matched Keywords</h3>
+          <div id="matched-skills" class="chip-container"></div>
+        </div>
+
+        <div class="results-section">
+          <h3>Missing / Recommended Keywords</h3>
+          <div id="missing-keywords" class="chip-container"></div>
+        </div>
+
+        <div class="results-section">
+          <h3>Tailored Professional Summary</h3>
+          <p id="tailored-summary-preview" class="summary-preview"></p>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 2: MASTER PROFILE -->
+    <section id="panel-profile" class="tab-panel">
+      <div class="card">
+        <div class="card-header">
+          <h2>Master Resume Baseline</h2>
+        </div>
+        <p class="card-desc">Your immutable ground truth. The AI re-weights your skills and bullet points to match the target JD without hallucinating.</p>
+
+        <div class="profile-actions-bar">
+          <label class="btn btn-secondary btn-sm file-upload-btn">
+            📂 Upload Resume (.txt, .json)
+            <input type="file" id="resume-file-input" accept=".txt,.md,.json" style="display: none;">
+          </label>
+          <button id="btn-load-sample" class="btn btn-subtle btn-sm" title="Pre-load a sample demo profile">
+            ⚡ Load Sample Profile
+          </button>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="prof-name">Full Name *</label>
+            <input type="text" id="prof-name" placeholder="John Doe">
+          </div>
+          <div class="form-group flex-1">
+            <label for="prof-email">Email</label>
+            <input type="email" id="prof-email" placeholder="john@example.com">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="prof-phone">Phone</label>
+            <input type="text" id="prof-phone" placeholder="+1 234 567 8900">
+          </div>
+          <div class="form-group flex-1">
+            <label for="prof-location">Location</label>
+            <input type="text" id="prof-location" placeholder="City, Country">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="prof-linkedin">LinkedIn URL</label>
+            <input type="url" id="prof-linkedin" placeholder="https://linkedin.com/in/...">
+          </div>
+          <div class="form-group flex-1">
+            <label for="prof-github">GitHub URL</label>
+            <input type="url" id="prof-github" placeholder="https://github.com/...">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="prof-summary">Base Professional Summary</label>
+          <textarea id="prof-summary" rows="3" placeholder="Overview of your years of experience, core stacks, and domain expertise..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="prof-skills">Technical Skills (Category: Skill1, Skill2)</label>
+          <textarea id="prof-skills" rows="4" placeholder="Languages: Python, TypeScript, Go&#10;Frameworks: React, Node.js, Express&#10;Cloud & Tools: Docker, AWS, Git"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="prof-experience">Work Experience (Format: Role | Company | Period & bullets)</label>
+          <textarea id="prof-experience" rows="5" placeholder="Senior Software Engineer | TechCorp Solutions | Jan 2022 – Present&#10;• Built high-concurrency microservices handling 5M daily requests&#10;• Designed scalable RESTful APIs with automated CI/CD pipelines"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="prof-projects">Projects (Format: Project Name | Tech Stack & bullets)</label>
+          <textarea id="prof-projects" rows="4" placeholder="Cloud Task Orchestrator | Node.js, TypeScript, PostgreSQL&#10;• Built distributed asynchronous event processing engine"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="prof-education">Education (Degree | Institution | Year)</label>
+          <textarea id="prof-education" rows="2" placeholder="B.S. in Computer Science | State University | 2018 – 2022"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="prof-certs">Certifications (One per line)</label>
+          <textarea id="prof-certs" rows="2" placeholder="AWS Certified Solutions Architect"></textarea>
+        </div>
+
+        <button id="btn-save-profile" class="btn btn-primary full-width">
+          💾 Save Master Profile
+        </button>
+      </div>
+    </section>
+
+    <!-- TAB 3: SETTINGS -->
+    <section id="panel-settings" class="tab-panel">
+      <div class="card">
+        <div class="card-header">
+          <h2>AI Provider Configuration</h2>
+        </div>
+        <p class="card-desc">Choose your preferred free AI model. Your API key is stored 100% locally in your browser (`chrome.storage.local`).</p>
+
+        <div class="form-group">
+          <label for="setting-provider">AI Provider</label>
+          <select id="setting-provider">
+            <option value="gemini">Google Gemini Flash (Recommended • 100% Free)</option>
+            <option value="groq">Groq Llama 3.3 70B (Fast • Free)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="setting-model">Model ID</label>
+          <input type="text" id="setting-model" value="gemini-2.0-flash">
+        </div>
+
+        <div class="form-group">
+          <label for="setting-api-key">API Key</label>
+          <input type="password" id="setting-api-key" placeholder="Paste your API key here">
+        </div>
+
+        <div class="help-box">
+          <div class="help-title">💡 How to get a free Google Gemini key (30 seconds):</div>
+          <ol class="help-list">
+            <li>Open <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a>.</li>
+            <li>Sign in with your Google Account.</li>
+            <li>Click <strong>"Get API key"</strong> &rarr; <strong>"Create API key"</strong>.</li>
+            <li>Paste your key above. It offers 1,500 requests/day completely free!</li>
+          </ol>
+        </div>
+
+        <button id="btn-save-settings" class="btn btn-primary full-width">
+          Save Settings
+        </button>
+      </div>
+    </section>
+
+    <!-- Global Toast Notification -->
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script type="module" src="dist/sidepanel.js"></script>
+</body>
+</html>

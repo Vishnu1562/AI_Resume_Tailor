@@ -1,0 +1,28 @@
+{
+  "name": "ai-resume-tailor",
+  "version": "1.0.0",
+  "description": "Chrome Extension to analyze job postings and generate ATS-tailored resumes using free AI models.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc"
+  },
+  "keywords": [
+    "chrome-extension",
+    "resume",
+    "ai",
+    "ats",
+    "gemini",
+    "groq"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.0.308",
+    "@types/node": "^22.13.9",
+    "jsdom": "^28.0.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.7"
+  }
+}
