@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   saveMasterProfile,
   getMasterProfile,
+  clearMasterProfile,
   validateProfile,
   saveSettings,
   getSettings,
@@ -28,6 +29,15 @@ describe('Profile Storage (HF-001, HF-002, VR-001, NF-002, RR-001)', () => {
           }),
           set: vi.fn((items: Record<string, any>, cb?: () => void) => {
             Object.assign(mockStorage, items);
+            if (cb) cb();
+            return Promise.resolve();
+          }),
+          remove: vi.fn((keys: string | string[], cb?: () => void) => {
+            if (typeof keys === 'string') {
+              delete mockStorage[keys];
+            } else if (Array.isArray(keys)) {
+              keys.forEach((k) => delete mockStorage[k]);
+            }
             if (cb) cb();
             return Promise.resolve();
           }),
@@ -109,6 +119,14 @@ describe('Profile Storage (HF-001, HF-002, VR-001, NF-002, RR-001)', () => {
     await saveMasterProfile(updated);
     const retrieved = await getMasterProfile();
     expect(retrieved?.personalInfo.phone).toBe('+1 (555) 999-9999');
+  });
+
+  it('HF-008: clears master profile from storage', async () => {
+    await saveMasterProfile(validProfile);
+    expect(await getMasterProfile()).toEqual(validProfile);
+
+    await clearMasterProfile();
+    expect(await getMasterProfile()).toBeNull();
   });
 
   it('saves and retrieves settings (provider, apiKey, model)', async () => {

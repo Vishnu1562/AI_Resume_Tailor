@@ -1,4 +1,4 @@
-import { getMasterProfile, saveMasterProfile, getSettings, saveSettings, validateProfile, } from './storage/profileStorage.js';
+import { getMasterProfile, saveMasterProfile, clearMasterProfile, getSettings, saveSettings, validateProfile, } from './storage/profileStorage.js';
 import { tailorResume } from './services/tailoringEngine.js';
 import { renderAtsHtml, formatAsMarkdown } from './services/atsPdfRenderer.js';
 import { parseResumeTextToProfile } from './services/resumeParser.js';
@@ -333,6 +333,7 @@ async function copyMarkdown() {
 function setupProfileTab() {
     const btnSave = document.getElementById('btn-save-profile');
     const btnLoadSample = document.getElementById('btn-load-sample');
+    const btnClear = document.getElementById('btn-clear-profile');
     const fileInput = document.getElementById('resume-file-input');
     btnSave?.addEventListener('click', async () => {
         const profile = readProfileFromForm();
@@ -355,6 +356,12 @@ function setupProfileTab() {
         await saveMasterProfile(DEMO_SAMPLE_PROFILE);
         updateProfileStatusBadge(true);
         showToast('Loaded demo sample profile!', 'success');
+    });
+    btnClear?.addEventListener('click', async () => {
+        clearProfileForm();
+        await clearMasterProfile();
+        updateProfileStatusBadge(false);
+        showToast('Profile fields and storage cleared.', 'info');
     });
     fileInput?.addEventListener('change', async (e) => {
         const file = e.target.files?.[0];
@@ -481,6 +488,27 @@ function populateProfileForm(profile) {
         .join('\n');
     setVal('prof-education', eduLines);
     setVal('prof-certs', (profile.certifications || []).join('\n'));
+}
+function clearProfileForm() {
+    const ids = [
+        'prof-name',
+        'prof-email',
+        'prof-phone',
+        'prof-location',
+        'prof-linkedin',
+        'prof-github',
+        'prof-summary',
+        'prof-skills',
+        'prof-experience',
+        'prof-projects',
+        'prof-education',
+        'prof-certs',
+    ];
+    ids.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el)
+            el.value = '';
+    });
 }
 // ------------------- TAB 3: SETTINGS -------------------
 function setupSettingsTab() {

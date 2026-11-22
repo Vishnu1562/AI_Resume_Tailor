@@ -33,6 +33,16 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
 - **Expected Results**: Toast notification "Profile saved successfully"; data is updated.
 - **Final State**: Updated profile stored.
 
+#### HF-008: Clear Master Profile Fields and Storage
+- **Preconditions**: Profile fields populated in Profile tab (from sample profile or saved storage).
+- **User Actions**: User clicks "Clear Fields" button.
+- **System Actions**:
+  1. Clears all input and textarea fields across the Profile form.
+  2. Removes the stored master profile from `chrome.storage.local`.
+  3. Updates profile status badge to "No Profile Set".
+- **Expected Results**: Form fields are completely empty; badge turns amber ("No Profile Set"); confirmation toast appears.
+- **Final State**: Form and storage are clean and empty.
+
 #### HF-003: Extract Job Details from Active Tab
 - **Preconditions**: User navigates to a job listing (e.g., on Greenhouse, Lever, Workday, or LinkedIn) and opens the extension side panel.
 - **User Actions**: Clicks "Fetch Current Job" or extension auto-detects page content.

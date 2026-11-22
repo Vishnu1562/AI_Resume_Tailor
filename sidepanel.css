@@ -255,6 +255,17 @@ textarea {
   background: #047857;
 }
 
+.btn-danger {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #ffffff;
+}
+
 .btn-subtle {
   background: transparent;
   color: #60a5fa;

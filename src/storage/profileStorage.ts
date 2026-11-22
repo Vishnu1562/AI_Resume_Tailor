@@ -54,6 +54,14 @@ export async function getMasterProfile(): Promise<MasterProfile | null> {
   return null;
 }
 
+export async function clearMasterProfile(): Promise<void> {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    await chrome.storage.local.remove(STORAGE_KEYS.MASTER_PROFILE);
+  } else if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(STORAGE_KEYS.MASTER_PROFILE);
+  }
+}
+
 export async function saveSettings(settings: ExtensionSettings): Promise<void> {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     await chrome.storage.local.set({ [STORAGE_KEYS.SETTINGS]: settings });

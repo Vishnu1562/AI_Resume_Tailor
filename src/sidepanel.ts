@@ -1,6 +1,7 @@
 import {
   getMasterProfile,
   saveMasterProfile,
+  clearMasterProfile,
   getSettings,
   saveSettings,
   validateProfile,
@@ -365,6 +366,7 @@ async function copyMarkdown() {
 function setupProfileTab() {
   const btnSave = document.getElementById('btn-save-profile') as HTMLButtonElement;
   const btnLoadSample = document.getElementById('btn-load-sample') as HTMLButtonElement;
+  const btnClear = document.getElementById('btn-clear-profile') as HTMLButtonElement;
   const fileInput = document.getElementById('resume-file-input') as HTMLInputElement;
 
   btnSave?.addEventListener('click', async () => {
@@ -389,6 +391,13 @@ function setupProfileTab() {
     await saveMasterProfile(DEMO_SAMPLE_PROFILE);
     updateProfileStatusBadge(true);
     showToast('Loaded demo sample profile!', 'success');
+  });
+
+  btnClear?.addEventListener('click', async () => {
+    clearProfileForm();
+    await clearMasterProfile();
+    updateProfileStatusBadge(false);
+    showToast('Profile fields and storage cleared.', 'info');
   });
 
   fileInput?.addEventListener('change', async (e: any) => {
@@ -526,6 +535,28 @@ function populateProfileForm(profile: MasterProfile) {
   setVal('prof-education', eduLines);
 
   setVal('prof-certs', (profile.certifications || []).join('\n'));
+}
+
+function clearProfileForm() {
+  const ids = [
+    'prof-name',
+    'prof-email',
+    'prof-phone',
+    'prof-location',
+    'prof-linkedin',
+    'prof-github',
+    'prof-summary',
+    'prof-skills',
+    'prof-experience',
+    'prof-projects',
+    'prof-education',
+    'prof-certs',
+  ];
+
+  ids.forEach((id) => {
+    const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement;
+    if (el) el.value = '';
+  });
 }
 
 // ------------------- TAB 3: SETTINGS -------------------
