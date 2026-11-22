@@ -232,13 +232,6 @@
     <div id="toast" class="toast"></div>
   </div>
 
-  <script type="module">
-    import * as pdfjsLib from './libs/pdf.min.mjs';
-    window.pdfjsLib = pdfjsLib;
-    if (pdfjsLib.GlobalWorkerOptions && typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('libs/pdf.worker.min.mjs');
-    }
-  </script>
   <script type="module" src="dist/sidepanel.js"></script>
 </body>
 </html>
