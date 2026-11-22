@@ -1,7 +1,13 @@
+export interface PdfTextItem {
+  str?: string;
+  transform?: number[];
+  hasEOL?: boolean;
+}
+
 export async function extractTextFromPdfContent(pdfDoc: {
   numPages: number;
   getPage: (pageNumber: number) => Promise<{
-    getTextContent: () => Promise<{ items: Array<{ str?: string }> }>;
+    getTextContent: () => Promise<{ items: Array<PdfTextItem> }>;
   }>;
 }): Promise<string> {
   let fullText = '';
@@ -9,13 +15,36 @@ export async function extractTextFromPdfContent(pdfDoc: {
   for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
     const page = await pdfDoc.getPage(pageNum);
     const content = await page.getTextContent();
-    const pageText = content.items
-      .map((item) => item.str || '')
-      .join(' ')
-      .trim();
+    let pageText = '';
+    let lastY: number | null = null;
 
-    if (pageText) {
-      fullText += (fullText ? '\n\n' : '') + pageText;
+    for (const item of content.items) {
+      const str = item.str || '';
+      const y = Array.isArray(item.transform) ? item.transform[5] : null;
+
+      // When vertical position changes significantly or hasEOL flag is true, insert newline
+      if (lastY !== null && y !== null && (Math.abs(y - lastY) > 4 || item.hasEOL)) {
+        if (!pageText.endsWith('\n')) {
+          pageText += '\n';
+        }
+      } else if (str && pageText.length > 0 && !pageText.endsWith('\n') && !pageText.endsWith(' ')) {
+        pageText += ' ';
+      }
+
+      pageText += str;
+
+      if (item.hasEOL && !pageText.endsWith('\n')) {
+        pageText += '\n';
+      }
+
+      if (y !== null) {
+        lastY = y;
+      }
+    }
+
+    const trimmed = pageText.trim();
+    if (trimmed) {
+      fullText += (fullText ? '\n\n' : '') + trimmed;
     }
   }
 
@@ -54,18 +83,22 @@ export async function getPdfjsLib(): Promise<any> {
 
   // 3. Fallback for Node / Vitest testing environment
   try {
-    const pdfjs = await import('pdfjs-dist');
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
     return pdfjs;
   } catch (err) {
-    // Last resort check
-    if (typeof globalThis !== 'undefined' && (globalThis as any).pdfjsLib) {
-      return (globalThis as any).pdfjsLib;
+    try {
+      const pdfjs = await import('pdfjs-dist');
+      return pdfjs;
+    } catch {
+      if (typeof globalThis !== 'undefined' && (globalThis as any).pdfjsLib) {
+        return (globalThis as any).pdfjsLib;
+      }
+      throw new Error('PDF parsing library could not be loaded.');
     }
-    throw new Error('PDF parsing library could not be loaded.');
   }
 }
 
-export async function extractTextFromPdf(data: ArrayBuffer): Promise<string> {
+export async function extractTextFromPdf(data: ArrayBuffer | Uint8Array): Promise<string> {
   try {
     const pdfjsLib = await getPdfjsLib();
 
@@ -74,7 +107,8 @@ export async function extractTextFromPdf(data: ArrayBuffer): Promise<string> {
     }
 
     const getDocumentFn = pdfjsLib.getDocument || pdfjsLib.default.getDocument;
-    const loadingTask = getDocumentFn({ data });
+    const uint8Data = data instanceof Uint8Array ? data : new Uint8Array(data);
+    const loadingTask = getDocumentFn({ data: uint8Data });
     const pdfDoc = await loadingTask.promise;
     return await extractTextFromPdfContent(pdfDoc);
   } catch (err: any) {

@@ -155,8 +155,10 @@ async function fetchActiveTabJob() {
     const companyEl = document.getElementById('job-company');
     const descEl = document.getElementById('job-description');
     const statusEl = document.getElementById('job-detection-status');
-    if (statusEl)
+    if (statusEl) {
         statusEl.textContent = 'Scanning active page...';
+        statusEl.className = 'status-text info';
+    }
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id) {
@@ -166,33 +168,103 @@ async function fetchActiveTabJob() {
         }
         const results = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: () => {
-                const titleEl = document.querySelector('h1.job-title, h1.topcard__title, h1');
-                const compEl = document.querySelector('.company-name, .topcard__flavor--black-link, [data-automation="job-company"]');
-                const descEl = document.querySelector('.job-description, #job-details, article, main');
+            args: [tab.url || ''],
+            func: (tabUrl) => {
+                // 1. Company Extraction
+                let company = '';
+                const compEl = document.querySelector('.company-name, .topcard__flavor--black-link, [data-automation="job-company"], [data-automation*="company" i], .employer, [data-company-name="true"], [class*="company" i], [class*="employer" i]');
+                if (compEl && compEl.innerText?.trim()) {
+                    company = compEl.innerText.trim();
+                }
+                if (!company) {
+                    const ogSite = document.querySelector('meta[property="og:site_name"]')?.getAttribute('content');
+                    if (ogSite?.trim())
+                        company = ogSite.trim();
+                }
+                if (!company && document.title) {
+                    const atMatch = document.title.match(/(?:at|@)\s+([A-Za-z0-9\s&]+?)(?:\s*[-|•–—]|$)/i);
+                    if (atMatch && atMatch[1].trim().length >= 2)
+                        company = atMatch[1].trim();
+                }
+                if (!company && tabUrl) {
+                    try {
+                        const host = new URL(tabUrl).hostname.toLowerCase();
+                        if (host.includes('ukg.com'))
+                            company = 'UKG';
+                        else if (host.includes('workdayjobs.com')) {
+                            const m = host.match(/^([a-z0-9_-]+)\.wd\d*\.myworkdayjobs\.com/);
+                            if (m)
+                                company = m[1].toUpperCase();
+                        }
+                        else if (host.includes('greenhouse.io') || host.includes('lever.co') || host.includes('ashbyhq.com')) {
+                            const p = new URL(tabUrl).pathname.split('/').filter(Boolean);
+                            if (p[0])
+                                company = p[0].charAt(0).toUpperCase() + p[0].slice(1);
+                        }
+                        else {
+                            const clean = host.replace(/^(apply\.|careers?\.|jobs?\.|www\.)/, '').split('.')[0];
+                            if (clean && clean.length >= 2)
+                                company = clean.charAt(0).toUpperCase() + clean.slice(1);
+                        }
+                    }
+                    catch { }
+                }
+                // 2. Title Extraction
+                let title = '';
+                const titleEl = document.querySelector('h1.job-title, h1.topcard__title, [data-automation="job-title"], [data-automation*="title" i], [class*="job-title" i], [class*="jobTitle" i], [class*="position-title" i], h1, h2');
+                if (titleEl && titleEl.innerText?.trim() && titleEl.innerText.trim().length >= 3) {
+                    title = titleEl.innerText.trim();
+                }
+                if (!title && document.title) {
+                    const parts = document.title.split(/[-|•–—]/);
+                    if (parts[0] && parts[0].trim().length >= 3)
+                        title = parts[0].trim();
+                }
+                // 3. Description Extraction
+                let description = '';
+                const descEl = document.querySelector('.job-description, #job-details, [data-automation="job-description"], [data-automation*="description" i], [itemprop="description"], [class*="job-description" i], [class*="jobDescription" i], [id*="job-description" i], [class*="job-detail" i], article, main, [role="main"]');
+                if (descEl && descEl.innerText && descEl.innerText.trim().length > 100) {
+                    description = descEl.innerText.trim();
+                }
+                else {
+                    // Fallback: search containers for highest text length
+                    const candidates = document.querySelectorAll('div, section');
+                    let maxLen = 0;
+                    candidates.forEach((c) => {
+                        const txt = c.innerText?.trim() || '';
+                        if (txt.length > maxLen && txt.length < 25000) {
+                            maxLen = txt.length;
+                            description = txt;
+                        }
+                    });
+                }
+                if (!description && document.body) {
+                    description = document.body.innerText?.trim() || '';
+                }
                 return {
-                    title: titleEl?.innerText?.trim() || document.title,
-                    company: compEl?.innerText?.trim() || '',
-                    description: descEl?.innerText?.trim() || document.body?.innerText?.trim() || '',
+                    title: title || '',
+                    company: company || '',
+                    description: description || '',
                 };
             },
         });
         const data = results?.[0]?.result;
-        if (data && data.description.length > 50) {
+        if (data && (data.title || data.description.length > 50)) {
             currentJob = {
                 title: data.title || 'Target Role',
                 company: data.company || 'Company',
                 description: data.description,
                 isDetected: true,
             };
-            if (titleEl)
+            if (titleEl && currentJob.title)
                 titleEl.value = currentJob.title;
-            if (companyEl)
+            if (companyEl && currentJob.company)
                 companyEl.value = currentJob.company;
-            if (descEl)
+            if (descEl && currentJob.description)
                 descEl.value = currentJob.description;
+            const words = currentJob.description ? currentJob.description.split(/\s+/).length : 0;
             if (statusEl) {
-                statusEl.textContent = `Job detected (${currentJob.description.split(/\s+/).length} words)`;
+                statusEl.textContent = `Scanned "${currentJob.title}" at ${currentJob.company} (${words} words)`;
                 statusEl.className = 'status-text success';
             }
         }
@@ -205,7 +277,7 @@ async function fetchActiveTabJob() {
     }
     catch (err) {
         if (statusEl) {
-            statusEl.textContent = 'Paste job description below manually.';
+            statusEl.textContent = `Scan error: ${err.message}. Paste job description below manually.`;
             statusEl.className = 'status-text warning';
         }
     }

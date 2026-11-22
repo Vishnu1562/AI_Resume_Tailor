@@ -1,5 +1,59 @@
 import type { MasterProfile } from '../types/index.js';
 
+export function cleanCandidateName(rawLine: string): string {
+  if (!rawLine) return '';
+
+  let name = rawLine.replace(/^#+\s*/, '').trim();
+
+  // Strip anything following pipes, bullets, dashes, or common role titles
+  const roleKeywords = [
+    'software',
+    'developer',
+    'engineer',
+    'consultant',
+    'architect',
+    'full-stack',
+    'full stack',
+    'backend',
+    'frontend',
+    'lead',
+    'manager',
+  ];
+
+  // If there are delimiters like | or • or -
+  const delimiterMatch = name.split(/\s*[\u2022|•–—\t]\s*/);
+  if (delimiterMatch.length > 1 && delimiterMatch[0].trim().length >= 2) {
+    name = delimiterMatch[0].trim();
+  }
+
+  // If role keywords are glued to the name, strip them
+  for (const kw of roleKeywords) {
+    const regex = new RegExp(`\\b${kw}\\b.*$`, 'i');
+    if (regex.test(name)) {
+      const candidatePart = name.replace(regex, '').trim();
+      if (candidatePart.length >= 2) {
+        name = candidatePart;
+        break;
+      }
+    }
+  }
+
+  return name.trim();
+}
+
+export function extractLocationFromText(text: string): string {
+  // Matches "City, State, Country" or "City, Country" or "City, State"
+  const locationMatch = text.match(/\b([A-Za-z\s]{2,25},\s*[A-Za-z\s]{2,25}(?:,\s*[A-Za-z\s]{2,25})?)\b/);
+  if (locationMatch) {
+    const loc = locationMatch[1].trim();
+    // Exclude false positives like "Object-Oriented Programming, SOLID"
+    if (!loc.includes('Programming') && !loc.includes('Architecture') && !loc.includes('Framework')) {
+      return loc;
+    }
+  }
+  return '';
+}
+
 export function parseResumeTextToProfile(rawText: string): MasterProfile {
   const emptyProfile: MasterProfile = {
     personalInfo: {
@@ -30,11 +84,10 @@ export function parseResumeTextToProfile(rawText: string): MasterProfile {
 
   if (lines.length === 0) return emptyProfile;
 
-  // 1. Extract Name (usually first non-empty line)
-  const nameLine = lines[0].replace(/^#+\s*/, '');
-  emptyProfile.personalInfo.fullName = nameLine;
+  // 1. Extract Name cleanly from first non-empty line
+  emptyProfile.personalInfo.fullName = cleanCandidateName(lines[0]);
 
-  // 2. Extract Contact Info via regex
+  // 2. Extract Contact Info via regex across full document
   const fullText = lines.join('\n');
   const emailMatch = fullText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
   if (emailMatch) emptyProfile.personalInfo.email = emailMatch[0];
@@ -48,66 +101,75 @@ export function parseResumeTextToProfile(rawText: string): MasterProfile {
   const githubMatch = fullText.match(/github\.com\/[a-zA-Z0-9_-]+/i);
   if (githubMatch) emptyProfile.personalInfo.github = `https://${githubMatch[0]}`;
 
-  // 3. Section splitter
+  // 3. Extract Location
+  const contactHeaderBlock = lines.slice(0, 5).join(' ');
+  emptyProfile.personalInfo.location = extractLocationFromText(contactHeaderBlock);
+
+  // 4. Robust Section Parser
   let currentSection = '';
   let currentExp: any = null;
   let currentProj: any = null;
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
-    const upper = line.toUpperCase().replace(/^#+\s*/, '').replace(/[:*_-]/g, '').trim();
+    const upper = line.toUpperCase().replace(/^#+\s*/, '').replace(/[:*_\-•–—]/g, '').trim();
+    const isShortHeader = line.length <= 50;
 
-    const isShortHeader = line.length <= 40;
-
-    if (isShortHeader && /^(PROFESSIONAL\s+)?(SUMMARY|OBJECTIVE|ABOUT\s+ME)$/i.test(upper)) {
+    // Detect Section Headers
+    if (isShortHeader && /^(PROFESSIONAL\s+|EXECUTIVE\s+)?(SUMMARY|OBJECTIVE|ABOUT\s+ME|PROFILE)$/i.test(upper)) {
       currentSection = 'SUMMARY';
       continue;
-    } else if (isShortHeader && /^(TECHNICAL\s+|CORE\s+)?SKILLS?$/i.test(upper)) {
+    } else if (isShortHeader && /^(TECHNICAL\s+|CORE\s+|KEY\s+)?SKILLS?$/i.test(upper)) {
       currentSection = 'SKILLS';
       continue;
-    } else if (isShortHeader && /^(PROFESSIONAL\s+|WORK\s+)?(EXPERIENCE|HISTORY|EMPLOYMENT)$/i.test(upper)) {
+    } else if (isShortHeader && /^(PROFESSIONAL\s+|WORK\s+|CAREER\s+)?(EXPERIENCE|HISTORY|EMPLOYMENT)$/i.test(upper)) {
       currentSection = 'EXPERIENCE';
       continue;
-    } else if (isShortHeader && /^(PERSONAL\s+|KEY\s+)?PROJECTS?$/i.test(upper)) {
+    } else if (isShortHeader && /^(PERSONAL\s+|KEY\s+|NOTABLE\s+)?PROJECTS?$/i.test(upper)) {
       currentSection = 'PROJECTS';
       continue;
-    } else if (isShortHeader && /^EDUCATION$/i.test(upper)) {
+    } else if (isShortHeader && /^(EDUCATION|ACADEMICS|QUALIFICATIONS)$/i.test(upper)) {
       currentSection = 'EDUCATION';
       continue;
     } else if (isShortHeader && /^(CERTIFICATIONS?|CERTIFICATES?|LICENSES?)$/i.test(upper)) {
       currentSection = 'CERTIFICATIONS';
       continue;
+    } else if (isShortHeader && /^(HONORS|AWARDS|ACHIEVEMENTS)$/i.test(upper)) {
+      currentSection = 'HONORS';
+      continue;
     }
 
+    // Process Content within Sections
     if (currentSection === 'SUMMARY') {
       emptyProfile.summary += (emptyProfile.summary ? ' ' : '') + line;
     } else if (currentSection === 'SKILLS') {
       const parts = line.split(/:\s*/);
       if (parts.length === 2) {
-        const cat = parts[0].replace(/^[*•-]\s*/, '').trim();
+        const cat = parts[0].replace(/^[*•\-\u2022\u25cf]\s*/, '').trim();
         const list = parts[1].split(/,\s*/).map((s) => s.trim()).filter(Boolean);
         emptyProfile.skills[cat] = list;
       } else {
-        const list = line.split(/,\s*/).map((s) => s.replace(/^[*•-]\s*/, '').trim()).filter(Boolean);
+        const list = line.split(/,\s*/).map((s) => s.replace(/^[*•\-\u2022\u25cf]\s*/, '').trim()).filter(Boolean);
         if (list.length > 0) {
-          emptyProfile.skills['General Skills'] = [
-            ...(emptyProfile.skills['General Skills'] || []),
+          emptyProfile.skills['Technical Skills'] = [
+            ...(emptyProfile.skills['Technical Skills'] || []),
             ...list,
           ];
         }
       }
     } else if (currentSection === 'EXPERIENCE') {
-      if (line.startsWith('•') || line.startsWith('*') || line.startsWith('-')) {
-        const bullet = line.replace(/^[*•-]\s*/, '').trim();
+      const isBullet = /^[*•\-\u2022\u25cf]/.test(line);
+      if (isBullet) {
+        const bullet = line.replace(/^[*•\-\u2022\u25cf]\s*/, '').trim();
         if (currentExp) {
           currentExp.bullets.push(bullet);
         } else {
-          currentExp = { company: 'Company', role: 'Role', bullets: [bullet] };
+          currentExp = { company: 'Company', role: 'Software Engineer', bullets: [bullet] };
           emptyProfile.experience.push(currentExp);
         }
       } else {
-        // Experience header line
-        const parts = line.split(/\||–|-/).map((s) => s.trim());
+        // Experience header line (e.g. Role | Company | Dates)
+        const parts = line.split(/\||–|—/).map((s) => s.trim());
         currentExp = {
           role: parts[0] || 'Software Engineer',
           company: parts[1] || 'Company',
@@ -117,8 +179,9 @@ export function parseResumeTextToProfile(rawText: string): MasterProfile {
         emptyProfile.experience.push(currentExp);
       }
     } else if (currentSection === 'PROJECTS') {
-      if (line.startsWith('•') || line.startsWith('*') || line.startsWith('-')) {
-        const bullet = line.replace(/^[*•-]\s*/, '').trim();
+      const isBullet = /^[*•\-\u2022\u25cf]/.test(line);
+      if (isBullet) {
+        const bullet = line.replace(/^[*•\-\u2022\u25cf]\s*/, '').trim();
         if (currentProj) {
           currentProj.bullets.push(bullet);
         } else {
@@ -126,7 +189,7 @@ export function parseResumeTextToProfile(rawText: string): MasterProfile {
           emptyProfile.projects.push(currentProj);
         }
       } else {
-        const parts = line.split(/\|/).map((s) => s.trim());
+        const parts = line.split(/\||–|—/).map((s) => s.trim());
         currentProj = {
           name: parts[0] || 'Project',
           techStack: parts[1] || '',
@@ -135,15 +198,18 @@ export function parseResumeTextToProfile(rawText: string): MasterProfile {
         emptyProfile.projects.push(currentProj);
       }
     } else if (currentSection === 'EDUCATION') {
-      const parts = line.split(/\||–/).map((s) => s.trim());
+      const parts = line.split(/\||–|—/).map((s) => s.trim());
       emptyProfile.education.push({
         degree: parts[0] || line,
         institution: parts[1] || '',
         year: parts[2] || '',
       });
     } else if (currentSection === 'CERTIFICATIONS') {
-      const cert = line.replace(/^[*•-]\s*/, '').trim();
+      const cert = line.replace(/^[*•\-\u2022\u25cf]\s*/, '').trim();
       if (cert) emptyProfile.certifications?.push(cert);
+    } else if (currentSection === 'HONORS') {
+      const honor = line.replace(/^[*•\-\u2022\u25cf]\s*/, '').trim();
+      if (honor) emptyProfile.honors?.push(honor);
     }
   }
 
