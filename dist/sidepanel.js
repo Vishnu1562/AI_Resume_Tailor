@@ -2,6 +2,7 @@ import { getMasterProfile, saveMasterProfile, clearMasterProfile, getSettings, s
 import { tailorResume } from './services/tailoringEngine.js';
 import { renderAtsHtml, formatAsMarkdown } from './services/atsPdfRenderer.js';
 import { parseResumeTextToProfile } from './services/resumeParser.js';
+import { extractTextFromPdf } from './services/pdfExtractor.js';
 // Generic dummy sample profile for demo / testing
 export const DEMO_SAMPLE_PROFILE = {
     personalInfo: {
@@ -368,12 +369,21 @@ function setupProfileTab() {
         if (!file)
             return;
         try {
-            const text = await file.text();
-            if (file.name.endsWith('.json')) {
-                const json = JSON.parse(text);
+            showToast('Reading and parsing resume file...', 'info');
+            let text = '';
+            if (file.name.toLowerCase().endsWith('.pdf')) {
+                const arrayBuffer = await file.arrayBuffer();
+                text = await extractTextFromPdf(arrayBuffer);
+                const parsed = parseResumeTextToProfile(text);
+                populateProfileForm(parsed);
+            }
+            else if (file.name.toLowerCase().endsWith('.json')) {
+                const rawJson = await file.text();
+                const json = JSON.parse(rawJson);
                 populateProfileForm(json);
             }
             else {
+                text = await file.text();
                 const parsed = parseResumeTextToProfile(text);
                 populateProfileForm(parsed);
             }
@@ -381,6 +391,9 @@ function setupProfileTab() {
         }
         catch (err) {
             showToast(`Failed to parse file: ${err.message}`, 'error');
+        }
+        finally {
+            fileInput.value = '';
         }
     });
 }

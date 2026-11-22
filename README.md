@@ -7,7 +7,7 @@ An AI-powered, privacy-first Chrome Extension (Manifest V3) that runs in the Chr
 ## 🌟 Key Features
 
 - **Universal & Accessible to Anyone**:
-  - Anyone can upload their existing resume (`.txt`, `.md`, `.json`) or paste their details into the **Master Profile** tab.
+  - Anyone can upload their existing resume (`.pdf`, `.txt`, `.md`, `.json`) or paste their details into the **Master Profile** tab.
   - Includes a **1-click "Load Sample Profile"** pre-seeded with a comprehensive full-stack engineering background.
 - **100% Free AI (No Subscription Required)**:
   - Powered by **Google Gemini Flash** (1,500 requests/day free via Google AI Studio).

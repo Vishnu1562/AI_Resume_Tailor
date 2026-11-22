@@ -106,8 +106,8 @@
 
         <div class="profile-actions-bar">
           <label class="btn btn-secondary btn-sm file-upload-btn">
-            📂 Upload Resume (.txt, .json)
-            <input type="file" id="resume-file-input" accept=".txt,.md,.json" style="display: none;">
+            📂 Upload Resume (.pdf, .txt, .json)
+            <input type="file" id="resume-file-input" accept=".pdf,.txt,.md,.json" style="display: none;">
           </label>
           <button id="btn-load-sample" class="btn btn-subtle btn-sm" title="Pre-load a sample demo profile">
             ⚡ Load Sample Profile
@@ -232,6 +232,13 @@
     <div id="toast" class="toast"></div>
   </div>
 
+  <script type="module">
+    import * as pdfjsLib from './libs/pdf.min.mjs';
+    window.pdfjsLib = pdfjsLib;
+    if (pdfjsLib.GlobalWorkerOptions && typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('libs/pdf.worker.min.mjs');
+    }
+  </script>
   <script type="module" src="dist/sidepanel.js"></script>
 </body>
 </html>
