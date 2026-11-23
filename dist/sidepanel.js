@@ -135,11 +135,11 @@ function updateProfileStatusBadge(hasProfile) {
     if (!badge)
         return;
     if (hasProfile) {
-        badge.textContent = 'Profile Ready ✓';
+        badge.innerHTML = '<span class="badge-dot"></span><span class="badge-text">Profile Ready ✓</span>';
         badge.className = 'badge badge-green';
     }
     else {
-        badge.textContent = 'No Profile Set';
+        badge.innerHTML = '<span class="badge-dot"></span><span class="badge-text">No Profile Set</span>';
         badge.className = 'badge badge-amber';
     }
 }
@@ -270,21 +270,21 @@ async function fetchActiveTabJob() {
                 descEl.value = currentJob.description;
             const words = currentJob.description ? currentJob.description.split(/\s+/).length : 0;
             if (statusEl) {
-                statusEl.textContent = `Scanned "${currentJob.title}" at ${currentJob.company} (${words} words)`;
-                statusEl.className = 'status-text success';
+                statusEl.innerHTML = `<span class="status-dot"></span><span class="status-msg">Scanned "${currentJob.title}" at ${currentJob.company} (${words} words)</span>`;
+                statusEl.className = 'status-banner success';
             }
         }
         else {
             if (statusEl) {
-                statusEl.textContent = 'Could not auto-detect job text. Please paste the job description below.';
-                statusEl.className = 'status-text warning';
+                statusEl.innerHTML = '<span class="status-dot"></span><span class="status-msg">Could not auto-detect job text. Paste job description below.</span>';
+                statusEl.className = 'status-banner warning';
             }
         }
     }
     catch (err) {
         if (statusEl) {
-            statusEl.textContent = `Scan error: ${err.message}. Paste job description below manually.`;
-            statusEl.className = 'status-text warning';
+            statusEl.innerHTML = `<span class="status-dot"></span><span class="status-msg">Scan error: ${err.message}. Paste job description below.</span>`;
+            statusEl.className = 'status-banner warning';
         }
     }
 }
@@ -340,8 +340,32 @@ function renderTailoredResults(tailored) {
     const matchedSkillsEl = document.getElementById('matched-skills');
     const missingKeywordsEl = document.getElementById('missing-keywords');
     const summaryEl = document.getElementById('tailored-summary-preview');
+    const circleEl = document.querySelector('.score-circle');
     if (scoreEl) {
         scoreEl.textContent = `${tailored.matchScore}%`;
+    }
+    if (circleEl) {
+        if (tailored.matchScore >= 80) {
+            circleEl.style.borderColor = 'rgba(16, 185, 129, 0.6)';
+            circleEl.style.background = 'radial-gradient(circle, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.04) 100%)';
+            circleEl.style.boxShadow = '0 0 16px rgba(16, 185, 129, 0.25)';
+            if (scoreEl)
+                scoreEl.style.color = '#34d399';
+        }
+        else if (tailored.matchScore >= 60) {
+            circleEl.style.borderColor = 'rgba(245, 158, 11, 0.6)';
+            circleEl.style.background = 'radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, rgba(245, 158, 11, 0.04) 100%)';
+            circleEl.style.boxShadow = '0 0 16px rgba(245, 158, 11, 0.25)';
+            if (scoreEl)
+                scoreEl.style.color = '#fbbf24';
+        }
+        else {
+            circleEl.style.borderColor = 'rgba(239, 68, 68, 0.6)';
+            circleEl.style.background = 'radial-gradient(circle, rgba(239, 68, 68, 0.18) 0%, rgba(239, 68, 68, 0.04) 100%)';
+            circleEl.style.boxShadow = '0 0 16px rgba(239, 68, 68, 0.25)';
+            if (scoreEl)
+                scoreEl.style.color = '#f87171';
+        }
     }
     if (matchedSkillsEl) {
         matchedSkillsEl.innerHTML = tailored.matchedSkills

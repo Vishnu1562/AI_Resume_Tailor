@@ -5,31 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Resume Tailor</title>
   <link rel="stylesheet" href="sidepanel.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
       <div class="logo-group">
-        <div class="logo-icon">⚡</div>
+        <div class="logo-icon-wrapper">
+          <div class="logo-glow"></div>
+          <div class="logo-icon">⚡</div>
+        </div>
         <div class="logo-text">
           <h1>AI Resume Tailor</h1>
           <span class="subtext">ATS Optimization Engine</span>
         </div>
       </div>
-      <div id="profile-status-badge" class="badge badge-amber">No Profile Set</div>
+      <div id="profile-status-badge" class="badge badge-amber">
+        <span class="badge-dot"></span>
+        <span class="badge-text">No Profile Set</span>
+      </div>
     </header>
 
     <!-- Navigation Tabs -->
     <nav class="tab-nav">
       <button class="nav-tab active" data-target="panel-tailor">
-        <span class="tab-icon">🚀</span> Tailor
+        <span class="tab-icon">✨</span>
+        <span>Tailor</span>
       </button>
       <button class="nav-tab" data-target="panel-profile">
-        <span class="tab-icon">👤</span> Master Profile
+        <span class="tab-icon">👤</span>
+        <span>Profile</span>
       </button>
       <button class="nav-tab" data-target="panel-settings">
-        <span class="tab-icon">⚙️</span> Settings
+        <span class="tab-icon">⚙️</span>
+        <span>Settings</span>
       </button>
     </nav>
 
@@ -37,19 +49,28 @@
     <main id="panel-tailor" class="tab-panel active">
       <div class="card">
         <div class="card-header">
-          <h2>Active Job Context</h2>
-          <button id="btn-fetch-job" class="btn-subtle" title="Re-scan active browser tab">↻ Scan Tab</button>
+          <div class="card-title-group">
+            <span class="section-icon">🎯</span>
+            <h2>Active Job Context</h2>
+          </div>
+          <button id="btn-fetch-job" class="btn-subtle" title="Re-scan active browser tab">
+            <span class="btn-icon">↻</span> Scan Tab
+          </button>
         </div>
-        <div id="job-detection-status" class="status-text info">Scanning active webpage...</div>
+
+        <div id="job-detection-status" class="status-banner info">
+          <span class="status-dot"></span>
+          <span class="status-msg">Scanning active webpage...</span>
+        </div>
 
         <div class="form-group">
           <label for="job-title">Job Title</label>
-          <input type="text" id="job-title" placeholder="e.g. Senior Software Developer (.NET)">
+          <input type="text" id="job-title" placeholder="e.g. Senior Software Engineer">
         </div>
 
         <div class="form-group">
           <label for="job-company">Company</label>
-          <input type="text" id="job-company" placeholder="e.g. Acme Corp, TechCorp, Globex">
+          <input type="text" id="job-company" placeholder="e.g. UKG, Google, Microsoft">
         </div>
 
         <div class="form-group">
@@ -57,8 +78,8 @@
           <textarea id="job-description" rows="5" placeholder="Job description will auto-populate from active tab, or paste it here manually..."></textarea>
         </div>
 
-        <button id="btn-tailor" class="btn btn-primary full-width">
-          ✨ Tailor Resume with AI
+        <button id="btn-tailor" class="btn btn-primary full-width btn-glow">
+          <span class="btn-icon">✨</span> Tailor Resume with AI
         </button>
         <div id="tailor-status" class="status-container"></div>
       </div>
@@ -67,31 +88,53 @@
       <div id="results-card" class="card results-card" style="display: none;">
         <div class="results-header">
           <div class="score-container">
-            <span class="score-label">ATS Match</span>
-            <span id="match-score" class="score-badge">--%</span>
+            <div class="score-circle">
+              <span id="match-score" class="score-badge">--%</span>
+            </div>
+            <div class="score-meta">
+              <span class="score-title">ATS Match</span>
+              <span class="score-sub">Target Relevance</span>
+            </div>
           </div>
           <div class="export-actions">
-            <button id="btn-download-pdf" class="btn btn-success btn-sm">📥 Download ATS PDF</button>
-            <button id="btn-download-md" class="btn btn-secondary btn-sm">📄 .md</button>
-            <button id="btn-copy-md" class="btn btn-subtle btn-sm">📋 Copy</button>
+            <button id="btn-download-pdf" class="btn btn-emerald btn-sm" title="Download printable ATS PDF">
+              📥 ATS PDF
+            </button>
+            <button id="btn-download-md" class="btn btn-secondary btn-sm" title="Download Markdown (.md)">
+              📄 .md
+            </button>
+            <button id="btn-copy-md" class="btn btn-subtle btn-sm" title="Copy Markdown to Clipboard">
+              📋 Copy
+            </button>
           </div>
         </div>
 
         <div class="section-divider"></div>
 
         <div class="results-section">
-          <h3>Matched Keywords</h3>
+          <div class="section-heading">
+            <span class="chip-count-dot dot-green"></span>
+            <h3>Matched Keywords</h3>
+          </div>
           <div id="matched-skills" class="chip-container"></div>
         </div>
 
         <div class="results-section">
-          <h3>Missing / Recommended Keywords</h3>
+          <div class="section-heading">
+            <span class="chip-count-dot dot-amber"></span>
+            <h3>Missing / Recommended Keywords</h3>
+          </div>
           <div id="missing-keywords" class="chip-container"></div>
         </div>
 
         <div class="results-section">
-          <h3>Tailored Professional Summary</h3>
-          <p id="tailored-summary-preview" class="summary-preview"></p>
+          <div class="section-heading">
+            <span class="chip-count-dot dot-indigo"></span>
+            <h3>Tailored Professional Summary</h3>
+          </div>
+          <div class="summary-wrapper">
+            <p id="tailored-summary-preview" class="summary-preview"></p>
+          </div>
         </div>
       </div>
     </main>
@@ -100,20 +143,23 @@
     <section id="panel-profile" class="tab-panel">
       <div class="card">
         <div class="card-header">
-          <h2>Master Resume Baseline</h2>
+          <div class="card-title-group">
+            <span class="section-icon">📋</span>
+            <h2>Master Resume Baseline</h2>
+          </div>
         </div>
-        <p class="card-desc">Your immutable ground truth. The AI re-weights your skills and bullet points to match the target JD without hallucinating.</p>
+        <p class="card-desc">Your immutable ground truth. The AI re-weights your verified skills and bullet points without hallucinating unearned credentials.</p>
 
         <div class="profile-actions-bar">
-          <label class="btn btn-secondary btn-sm file-upload-btn">
-            📂 Upload Resume (.pdf, .txt, .json)
+          <label class="btn btn-secondary btn-sm file-upload-btn" title="Upload an existing resume file">
+            <span class="btn-icon">📂</span> Upload (.pdf, .txt, .json)
             <input type="file" id="resume-file-input" accept=".pdf,.txt,.md,.json" style="display: none;">
           </label>
-          <button id="btn-load-sample" class="btn btn-subtle btn-sm" title="Pre-load a sample demo profile">
-            ⚡ Load Sample Profile
+          <button id="btn-load-sample" class="btn btn-subtle btn-sm" title="Pre-load demo template profile">
+            ⚡ Demo
           </button>
           <button id="btn-clear-profile" class="btn btn-danger btn-sm" title="Clear all profile fields">
-            🗑️ Clear Fields
+            🗑️ Clear
           </button>
         </div>
 
@@ -180,7 +226,7 @@
           <textarea id="prof-certs" rows="2" placeholder="AWS Certified Solutions Architect"></textarea>
         </div>
 
-        <button id="btn-save-profile" class="btn btn-primary full-width">
+        <button id="btn-save-profile" class="btn btn-primary full-width btn-glow">
           💾 Save Master Profile
         </button>
       </div>
@@ -190,27 +236,30 @@
     <section id="panel-settings" class="tab-panel">
       <div class="card">
         <div class="card-header">
-          <h2>AI Provider Configuration</h2>
+          <div class="card-title-group">
+            <span class="section-icon">⚡</span>
+            <h2>AI Engine Configuration</h2>
+          </div>
         </div>
-        <p class="card-desc">Choose your preferred free AI model. Your API key is stored 100% locally in your browser (`chrome.storage.local`).</p>
+        <p class="card-desc">Privacy First: Your API key and profiles are stored 100% locally in your browser sandbox (`chrome.storage.local`). Zero third-party telemetry.</p>
 
         <div class="form-group">
           <label for="setting-provider">AI Provider</label>
           <select id="setting-provider">
             <option value="gemini">Google Gemini Flash (Recommended • 100% Free)</option>
-            <option value="groq">Groq Llama 3.3 70B (Fast • Free)</option>
+            <option value="groq">Groq Llama 3.3 70B (Ultra-Fast • Free)</option>
           </select>
         </div>
 
         <div class="form-group">
           <div class="field-header">
             <label for="setting-model">Model ID</label>
-            <button type="button" id="btn-detect-model" class="btn-link" title="Query Google AI Studio for the newest active Flash model">
+            <button type="button" id="btn-detect-model" class="btn-link" title="Query Google AI Studio for newest active model">
               ↻ Auto-Detect Latest
             </button>
           </div>
           <input type="text" id="setting-model" value="gemini-3.8-flash" placeholder="auto (or e.g. gemini-3.8-flash)">
-          <span class="subtext" style="display:block; margin-top:4px;">Tip: Leave as "auto" to always dynamically use Google's latest free Flash model.</span>
+          <span class="subtext-tip">Tip: Set to "auto" to automatically discover Google's latest active Flash model.</span>
         </div>
 
         <div class="form-group">
@@ -219,16 +268,16 @@
         </div>
 
         <div class="help-box">
-          <div class="help-title">💡 How to get a free Google Gemini key (30 seconds):</div>
+          <div class="help-title">💡 Quick Guide: Get a free Gemini Key (30 seconds)</div>
           <ol class="help-list">
-            <li>Open <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a>.</li>
-            <li>Sign in with your Google Account.</li>
-            <li>Click <strong>"Get API key"</strong> &rarr; <strong>"Create API key"</strong>.</li>
-            <li>Paste your key above. It offers 1,500 requests/day completely free!</li>
+            <li>Visit <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a>.</li>
+            <li>Sign in with your Google account.</li>
+            <li>Click <strong>"Create API Key"</strong> and copy it.</li>
+            <li>Paste your key above. It includes generous free daily quota!</li>
           </ol>
         </div>
 
-        <button id="btn-save-settings" class="btn btn-primary full-width">
+        <button id="btn-save-settings" class="btn btn-primary full-width btn-glow">
           Save Settings
         </button>
       </div>
