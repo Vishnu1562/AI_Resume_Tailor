@@ -168,12 +168,33 @@ function setupTailorTab() {
   const btnDownloadPdf = document.getElementById('btn-download-pdf') as HTMLButtonElement;
   const btnDownloadMd = document.getElementById('btn-download-md') as HTMLButtonElement;
   const btnCopyMd = document.getElementById('btn-copy-md') as HTMLButtonElement;
+  const descEl = document.getElementById('job-description') as HTMLTextAreaElement;
+  const titleEl = document.getElementById('job-title') as HTMLInputElement;
+  const companyEl = document.getElementById('job-company') as HTMLInputElement;
 
   btnFetch?.addEventListener('click', fetchActiveTabJob);
   btnTailor?.addEventListener('click', executeTailoring);
   btnDownloadPdf?.addEventListener('click', downloadPdf);
   btnDownloadMd?.addEventListener('click', downloadMarkdown);
   btnCopyMd?.addEventListener('click', copyMarkdown);
+
+  descEl?.addEventListener('input', () => {
+    const text = descEl.value.trim();
+    const words = text ? text.split(/\s+/).length : 0;
+    if (words >= 30) {
+      currentJob = {
+        title: titleEl?.value.trim() || 'Target Role',
+        company: companyEl?.value.trim() || 'Target Company',
+        description: text,
+        isDetected: true,
+      };
+      const statusEl = document.getElementById('job-detection-status');
+      if (statusEl) {
+        statusEl.innerHTML = `<span class="status-dot"></span><span class="status-msg">Manual job description provided (${words} words)</span>`;
+        statusEl.className = 'status-banner success';
+      }
+    }
+  });
 }
 
 async function fetchActiveTabJob() {
@@ -184,13 +205,16 @@ async function fetchActiveTabJob() {
 
   if (statusEl) {
     statusEl.textContent = 'Scanning active page...';
-    statusEl.className = 'status-text info';
+    statusEl.className = 'status-banner info';
   }
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) {
-      if (statusEl) statusEl.textContent = 'No active webpage found.';
+      if (statusEl) {
+        statusEl.innerHTML = '<span class="status-dot"></span><span class="status-msg">No active webpage found.</span>';
+        statusEl.className = 'status-banner warning';
+      }
       return;
     }
 
@@ -198,6 +222,74 @@ async function fetchActiveTabJob() {
       target: { tabId: tab.id },
       args: [tab.url || ''],
       func: (tabUrl: string) => {
+        const blockedPatterns = [
+          /google\.[a-z.]+\/search/i,
+          /bing\.com\/search/i,
+          /duckduckgo\.com/i,
+          /search\.yahoo\.com/i,
+          /ecosia\.org/i,
+          /youtube\.com/i,
+          /wikipedia\.org/i,
+          /reddit\.com/i,
+          /twitter\.com/i,
+          /x\.com/i,
+          /facebook\.com/i,
+          /instagram\.com/i,
+          /tiktok\.com/i,
+          /netflix\.com/i,
+          /imdb\.com/i,
+        ];
+
+        const atsPatterns = [
+          /greenhouse\.io/i,
+          /lever\.co/i,
+          /workdayjobs\.com/i,
+          /ashbyhq\.com/i,
+          /ukg\.com/i,
+          /icims\.com/i,
+          /smartrecruiters\.com/i,
+          /bamboohr\.com/i,
+          /jobvite\.com/i,
+          /taleo\.net/i,
+          /breezy\.hr/i,
+          /jazzhr\.com/i,
+          /workable\.com/i,
+          /linkedin\.com\/jobs/i,
+          /indeed\.com/i,
+          /glassdoor\.com/i,
+          /careers?\./i,
+          /\/jobs?\//i,
+          /\/careers?\//i,
+        ];
+
+        const jobKeywords = [
+          /\bresponsibilities\b/i,
+          /\bqualifications\b/i,
+          /\brequirements\b/i,
+          /\bexperience\b/i,
+          /\babout the (role|job|position)\b/i,
+          /\bwhat you('ll| will) do\b/i,
+          /\bskills\b/i,
+          /\bapply\b/i,
+          /\bbenefits\b/i,
+          /\bjob description\b/i,
+          /\bpreferred qualifications\b/i,
+          /\bminimum qualifications\b/i,
+          /\bkey responsibilities\b/i,
+          /\brole overview\b/i,
+          /\bequal opportunity\b/i,
+        ];
+
+        if (tabUrl && blockedPatterns.some((p) => p.test(tabUrl))) {
+          return {
+            title: '',
+            company: '',
+            description: '',
+            isDetected: false,
+            reason: 'blocked_domain',
+          };
+        }
+
         // 1. Company Extraction
         let company = '';
         const compEl = document.querySelector(
@@ -250,12 +342,14 @@ async function fetchActiveTabJob() {
 
         // 3. Description Extraction
         let description = '';
+        let hasJobSelectors = false;
         const descEl = document.querySelector(
           '.job-description, #job-details, [data-automation="job-description"], [data-automation*="description" i], [itemprop="description"], [class*="job-description" i], [class*="jobDescription" i], [id*="job-description" i], [class*="job-detail" i], article, main, [role="main"]'
         ) as HTMLElement;
 
         if (descEl && descEl.innerText && descEl.innerText.trim().length > 100) {
           description = descEl.innerText.trim();
+          hasJobSelectors = true;
         } else {
           // Fallback: search containers for highest text length
           const candidates = document.querySelectorAll('div, section');
@@ -273,16 +367,45 @@ async function fetchActiveTabJob() {
           description = document.body.innerText?.trim() || '';
         }
 
+        // Evaluate whether this page is a legitimate job posting
+        let isLikelyJob = false;
+        if (tabUrl && atsPatterns.some((p) => p.test(tabUrl)) && description.length >= 80) {
+          isLikelyJob = true;
+        } else if (hasJobSelectors && description.length >= 80) {
+          isLikelyJob = true;
+        } else {
+          let hits = 0;
+          for (const p of jobKeywords) {
+            if (p.test(description)) {
+              hits++;
+              if (hits >= 2) break;
+            }
+          }
+          if (hits >= 2 && description.length >= 80) {
+            isLikelyJob = true;
+          }
+        }
+
+        if (!isLikelyJob) {
+          return {
+            title: '',
+            company: '',
+            description: '',
+            isDetected: false,
+          };
+        }
+
         return {
           title: title || '',
           company: company || '',
           description: description || '',
+          isDetected: true,
         };
       },
     });
 
     const data = results?.[0]?.result;
-    if (data && (data.title || data.description.length > 50)) {
+    if (data && data.isDetected && data.description) {
       currentJob = {
         title: data.title || 'Target Role',
         company: data.company || 'Company',
@@ -300,8 +423,18 @@ async function fetchActiveTabJob() {
         statusEl.className = 'status-banner success';
       }
     } else {
+      currentJob = {
+        title: '',
+        company: '',
+        description: '',
+        isDetected: false,
+      };
+      if (titleEl) titleEl.value = '';
+      if (companyEl) companyEl.value = '';
+      if (descEl) descEl.value = '';
+
       if (statusEl) {
-        statusEl.innerHTML = '<span class="status-dot"></span><span class="status-msg">Could not auto-detect job text. Paste job description below.</span>';
+        statusEl.innerHTML = '<span class="status-dot"></span><span class="status-msg">⚠️ No job posting detected on this page. Navigate to a job listing or paste the job description below.</span>';
         statusEl.className = 'status-banner warning';
       }
     }

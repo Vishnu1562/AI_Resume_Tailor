@@ -53,4 +53,79 @@ describe('Content Scraper (HF-003, NF-003, EC-001, EC-002)', () => {
     expect(sanitized).toContain('Build high-throughput APIs');
     expect(sanitized).toContain('Maintain 99.9% uptime');
   });
+
+  it('NF-011 & VR-003: suppresses job extraction on search engine pages (e.g. Google Search Before Sunrise)', () => {
+    document.title = 'Before Sunrise - Google Search';
+    document.body.innerHTML = `
+      <div id="search">
+        <h1>Search Results</h1>
+        <div class="result">
+          <h2>Before Sunrise (1995)</h2>
+          <p>Ethan Hawke and Julie Delpy star in this romantic drama about two travelers who meet on a train in Europe.</p>
+          <p>Rotten Tomatoes rating: 100%. Watch trailer on YouTube. Available on Amazon Prime Video.</p>
+          ${'Additional search snippet content about actors, director Richard Linklater, reviews and showtimes. '.repeat(10)}
+        </div>
+      </div>
+    `;
+
+    const details = extractJobDetails(document, 'https://www.google.com/search?q=before+sunrise');
+    expect(details.isDetected).toBe(false);
+    expect(details.title).toBe('');
+    expect(details.company).toBe('');
+    expect(details.description).toBe('');
+  });
+
+  it('VR-003: suppresses job extraction on media and social platforms (YouTube, Wikipedia, Reddit, IMDb)', () => {
+    document.title = 'Before Sunrise - Wikipedia';
+    document.body.innerHTML = `
+      <div id="content">
+        <h1>Before Sunrise</h1>
+        <p>Before Sunrise is a 1995 romantic drama film directed by Richard Linklater and co-written by Linklater and Kim Krizan.</p>
+        <p>${'Plot summary, cast details, production information, and critical reception. '.repeat(15)}</p>
+      </div>
+    `;
+
+    const details = extractJobDetails(document, 'https://en.wikipedia.org/wiki/Before_Sunrise');
+    expect(details.isDetected).toBe(false);
+    expect(details.title).toBe('');
+    expect(details.company).toBe('');
+  });
+
+  it('VR-003: accepts genuine job postings on custom company domains when job keywords are present', () => {
+    document.title = 'Backend Engineer - Stripe Careers';
+    document.body.innerHTML = `
+      <div>
+        <h1>Backend Engineer, Core Infrastructure</h1>
+        <p>Stripe is looking for a Software Engineer to join our team.</p>
+        <h3>Responsibilities:</h3>
+        <p>Design, build, and maintain high-throughput transaction processing systems with low latency.</p>
+        <h3>Requirements & Qualifications:</h3>
+        <p>Experience with distributed systems, Java or Go, SQL databases, and cloud architecture.</p>
+        <p>Competitive benefits and equal opportunity employer.</p>
+      </div>
+    `;
+
+    const details = extractJobDetails(document, 'https://stripe.com/jobs/backend-engineer-123');
+    expect(details.isDetected).toBe(true);
+    expect(details.title).toContain('Backend Engineer');
+    expect(details.description).toContain('Responsibilities');
+    expect(details.description).toContain('Qualifications');
+  });
+
+  it('VR-003: accepts job postings on verified ATS platforms (UKG, Workday, Greenhouse, Lever, Ashby)', () => {
+    document.title = 'Software Engineer at UKG';
+    document.body.innerHTML = `
+      <div class="job-container">
+        <h1>Software Engineer</h1>
+        <div class="job-details">
+          <p>Join UKG to build human capital management software.</p>
+          <p>Key skills include Java, Spring Boot, microservices, and Agile methodologies.</p>
+        </div>
+      </div>
+    `;
+
+    const details = extractJobDetails(document, 'https://apply.ukg.com/careers/job/893398783398');
+    expect(details.isDetected).toBe(true);
+    expect(details.company).toBe('UKG');
+  });
 });

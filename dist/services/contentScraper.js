@@ -1,3 +1,84 @@
+export const BLOCKED_DOMAINS = [
+    /google\.[a-z.]+\/search/i,
+    /bing\.com\/search/i,
+    /duckduckgo\.com/i,
+    /search\.yahoo\.com/i,
+    /ecosia\.org/i,
+    /youtube\.com/i,
+    /wikipedia\.org/i,
+    /reddit\.com/i,
+    /twitter\.com/i,
+    /x\.com/i,
+    /facebook\.com/i,
+    /instagram\.com/i,
+    /tiktok\.com/i,
+    /netflix\.com/i,
+    /imdb\.com/i,
+];
+export const ATS_DOMAINS = [
+    /greenhouse\.io/i,
+    /lever\.co/i,
+    /workdayjobs\.com/i,
+    /ashbyhq\.com/i,
+    /ukg\.com/i,
+    /icims\.com/i,
+    /smartrecruiters\.com/i,
+    /bamboohr\.com/i,
+    /jobvite\.com/i,
+    /taleo\.net/i,
+    /breezy\.hr/i,
+    /jazzhr\.com/i,
+    /workable\.com/i,
+    /linkedin\.com\/jobs/i,
+    /indeed\.com/i,
+    /glassdoor\.com/i,
+    /careers?\./i,
+    /\/jobs?\//i,
+    /\/careers?\//i,
+];
+export const JOB_KEYWORDS = [
+    /\bresponsibilities\b/i,
+    /\bqualifications\b/i,
+    /\brequirements\b/i,
+    /\bexperience\b/i,
+    /\babout the (role|job|position)\b/i,
+    /\bwhat you('ll| will) do\b/i,
+    /\bskills\b/i,
+    /\bapply\b/i,
+    /\bbenefits\b/i,
+    /\bjob description\b/i,
+    /\bpreferred qualifications\b/i,
+    /\bminimum qualifications\b/i,
+    /\bkey responsibilities\b/i,
+    /\brole overview\b/i,
+    /\bequal opportunity\b/i,
+];
+export function isLikelyJobPage(text, url = '', hasJobSelectors = false) {
+    if (url) {
+        for (const pattern of BLOCKED_DOMAINS) {
+            if (pattern.test(url))
+                return false;
+        }
+        for (const pattern of ATS_DOMAINS) {
+            if (pattern.test(url) && text.length >= 80)
+                return true;
+        }
+    }
+    // If explicit job container selectors matched on a non-blocked page
+    if (hasJobSelectors && text.length >= 80) {
+        return true;
+    }
+    // Keyword check: requires at least 2 distinct job signals
+    let keywordHits = 0;
+    for (const pattern of JOB_KEYWORDS) {
+        if (pattern.test(text)) {
+            keywordHits++;
+            if (keywordHits >= 2)
+                break;
+        }
+    }
+    return keywordHits >= 2 && text.length >= 80;
+}
 export function sanitizeJobContent(text, maxLength = 6000) {
     if (!text)
         return '';
@@ -14,6 +95,10 @@ export function sanitizeJobContent(text, maxLength = 6000) {
 export function extractCompanyFromUrl(url) {
     if (!url)
         return '';
+    for (const pattern of BLOCKED_DOMAINS) {
+        if (pattern.test(url))
+            return '';
+    }
     try {
         const parsed = new URL(url);
         const host = parsed.hostname.toLowerCase();
@@ -144,11 +229,13 @@ export function extractJobDetails(doc = document, url = '') {
         'main',
         '[role="main"]',
     ];
+    let hasJobSelectors = false;
     let rawDesc = '';
     for (const sel of descSelectors) {
         const el = doc.querySelector(sel);
         if (el && el.innerText && el.innerText.trim().length > 100) {
             rawDesc = el.innerText.trim();
+            hasJobSelectors = true;
             break;
         }
     }
@@ -174,12 +261,21 @@ export function extractJobDetails(doc = document, url = '') {
         rawDesc = doc.body.innerText?.trim() || doc.body.textContent?.trim() || '';
     }
     const sanitized = sanitizeJobContent(rawDesc);
-    const isDetected = sanitized.length >= 80;
+    const isDetected = isLikelyJobPage(sanitized, currentUrl, hasJobSelectors);
+    if (!isDetected) {
+        return {
+            title: '',
+            company: '',
+            description: '',
+            url: currentUrl,
+            isDetected: false,
+        };
+    }
     return {
         title: title || 'Target Role',
         company: company || 'Target Company',
         description: sanitized,
         url: currentUrl,
-        isDetected,
+        isDetected: true,
     };
 }

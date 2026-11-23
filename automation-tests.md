@@ -194,6 +194,17 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
 - **Expected Results**: Displays error: "Unable to parse file. Please upload a standard PDF, DOCX, or text file, or paste your resume text directly."
 - **Final State**: No corrupted state saved.
 
+#### NF-011: Filter Non-Job Pages (Search Engines, Social Platforms) with Amber Banner
+- **Preconditions**: Active tab is a search engine (e.g. Google Search, Bing) or media/social platform (YouTube, Wikipedia, Reddit, Netflix, IMDb).
+- **User Actions**: User opens extension or clicks "Scan Tab".
+- **System Actions**:
+  1. Content scraper checks URL and page content against non-job patterns and job heuristics.
+  2. Detects blocked domain or absence of job listing signals (`responsibilities`, `qualifications`, `requirements`, etc.).
+  3. Sets `isDetected: false`, suppresses false job titles (e.g. "Search Results") and companies (e.g. "Google"), and leaves job description clean.
+  4. Renders an amber status warning banner in the side panel: "⚠️ No job posting detected on this page. Navigate to a job listing or paste the job description below."
+- **Expected Results**: Amber warning banner displayed, no bogus job details auto-filled.
+- **Final State**: System prevents false-positive job detection; user can navigate to a job listing or paste manually.
+
 ---
 
 ### Validation & Edge Cases
@@ -211,6 +222,23 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
   - Re-ordering and emphasizing relevant skills.
   - Highlighting matching technologies in project and experience descriptions.
   - Rewriting professional summary to align with the JD's primary domain.
+
+#### VR-003: Smart Job Page Heuristic Detection
+- Content scraper must evaluate whether a page represents a genuine job posting using deterministic heuristics:
+  1. **Blocked Domains**: Known search engines (`google.com/search`, `bing.com/search`, etc.) and non-job media/social domains (`youtube.com`, `wikipedia.org`, `reddit.com`, `netflix.com`, `imdb.com`) immediately fail job validation (`isJob: false`).
+  2. **Verified ATS Domains**: High-confidence ATS hosts (`ukg.com`, `workdayjobs.com`, `greenhouse.io`, `lever.co`, `ashbyhq.com`, `indeed.com`, `linkedin.com/jobs`, etc.) are recognized as job portals if text length >= 80 characters.
+  3. **Job Keyword Signals**: On custom corporate domains or company career portals, text must contain at least 2 distinct job keywords (e.g., `responsibilities`, `qualifications`, `requirements`, `experience`, `about the role`, `skills`, `apply now`, `benefits`, `job description`).
+  4. Pages failing these criteria return `isDetected: false` and empty strings for title, company, and description.
+
+#### EC-004: Manual Job Description Fallback after Non-Job Detection
+- **Preconditions**: User is on a non-job page where heuristic detection showed amber warning banner.
+- **User Actions**: User pastes target job description text into the textarea.
+- **System Actions**:
+  1. Textarea input listener counts words in pasted text.
+  2. When word count >= 30, updates status banner to green: "Manual job description provided (X words)".
+  3. Enables user to click "Tailor Resume with AI" with manual context.
+- **Expected Results**: User can successfully tailor resume against manually provided job context even when active tab is not a job portal.
+- **Final State**: Tailoring succeeds with manual input.
 
 #### EC-001: Extremely Long Job Posting (> 15,000 words)
 - System sanitizes and truncates extraneous boilerplate (EEO statements, cookie notices, legal disclaimers) to keep tokens focused on role responsibilities and requirements.
