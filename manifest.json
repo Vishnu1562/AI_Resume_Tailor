@@ -13,7 +13,12 @@
     "<all_urls>"
   ],
   "action": {
-    "default_title": "Open AI Resume Tailor"
+    "default_title": "Open AI Resume Tailor",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "side_panel": {
     "default_path": "sidepanel.html"
