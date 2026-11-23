@@ -110,35 +110,51 @@ export async function tailorResume(profile, job, settings) {
             const targetModel = candidateModels[i];
             usedModel = targetModel;
             res = await callGemini(targetModel, true);
-            if (res.ok) {
-                break;
+            if (!res.ok) {
+                let errData = await res.json().catch(() => ({}));
+                lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+                // If the model does not support JSON mode, retry without responseMimeType
+                if (lastErrorMessage.toLowerCase().includes('json mode is not enabled') ||
+                    lastErrorMessage.toLowerCase().includes('response_mime_type is not supported')) {
+                    console.warn(`Model ${targetModel} does not support JSON mode. Retrying without responseMimeType...`);
+                    res = await callGemini(targetModel, false);
+                    if (!res.ok) {
+                        errData = await res.json().catch(() => ({}));
+                        lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+                    }
+                }
             }
-            let errData = await res.json().catch(() => ({}));
-            lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
-            // If the model does not support JSON mode (e.g. "JSON mode is not enabled for this model"),
-            // immediately retry without responseMimeType!
-            if (lastErrorMessage.toLowerCase().includes('json mode is not enabled') ||
-                lastErrorMessage.toLowerCase().includes('response_mime_type is not supported')) {
-                console.warn(`Model ${targetModel} does not support JSON mode. Retrying without responseMimeType...`);
-                res = await callGemini(targetModel, false);
-                if (res.ok) {
+            // If res is ok, extract content from candidates
+            if (res && res.ok) {
+                const data = await res.json().catch(() => ({}));
+                const candidate = data?.candidates?.[0];
+                const parts = candidate?.content?.parts || [];
+                // Filter out thought parts (thinking tokens) and take text parts
+                const nonThoughtParts = parts.filter((p) => !p.thought && p.text);
+                const textParts = nonThoughtParts.length > 0 ? nonThoughtParts : parts.filter((p) => p.text);
+                rawJsonText = textParts.map((p) => p.text).join('').trim();
+                if (rawJsonText) {
                     break;
                 }
-                errData = await res.json().catch(() => ({}));
-                lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+                const reason = candidate?.finishReason || data?.promptFeedback?.blockReason || 'Empty content';
+                lastErrorMessage = `Model ${targetModel} returned empty content (reason: ${reason})`;
+                console.warn(`${lastErrorMessage}. Cascading to next live model...`);
             }
-            // Check if error is high demand / capacity spike
-            const isHighDemandOrOverloaded = res.status === 503 ||
-                lastErrorMessage.toLowerCase().includes('high demand') ||
-                lastErrorMessage.toLowerCase().includes('spikes in demand') ||
-                lastErrorMessage.toLowerCase().includes('overloaded');
+            // Check if error is high demand / capacity spike OR empty content
+            const isHighDemandOrOverloaded = !res.ok &&
+                (res.status === 503 ||
+                    lastErrorMessage.toLowerCase().includes('high demand') ||
+                    lastErrorMessage.toLowerCase().includes('spikes in demand') ||
+                    lastErrorMessage.toLowerCase().includes('overloaded'));
             // Check if error is model deprecated / not found / unsupported method
-            const isUnavailableOrNotFound = res.status === 404 ||
-                lastErrorMessage.includes('no longer available') ||
-                lastErrorMessage.includes('not found') ||
-                lastErrorMessage.includes('deprecated') ||
-                lastErrorMessage.includes('not supported for generateContent');
-            if (isHighDemandOrOverloaded || isUnavailableOrNotFound) {
+            const isUnavailableOrNotFound = !res.ok &&
+                (res.status === 404 ||
+                    lastErrorMessage.includes('no longer available') ||
+                    lastErrorMessage.includes('not found') ||
+                    lastErrorMessage.includes('deprecated') ||
+                    lastErrorMessage.includes('not supported for generateContent'));
+            const isEmptyContent = res.ok && !rawJsonText;
+            if (isHighDemandOrOverloaded || isUnavailableOrNotFound || isEmptyContent) {
                 // If we reached the end of current candidate list, query Google's live endpoint
                 if (i >= candidateModels.length - 1) {
                     console.warn(`Model ${targetModel} issue (${lastErrorMessage}). Querying Google AI Studio for live active models...`);
@@ -157,8 +173,8 @@ export async function tailorResume(profile, job, settings) {
             // If it's a non-recoverable error (e.g. invalid API key 400/403 or quota 429), break
             break;
         }
-        if (!res || !res.ok) {
-            throw new Error(`Gemini API Error: ${lastErrorMessage}`);
+        if (!res || !res.ok || !rawJsonText) {
+            throw new Error(`Gemini API Error: ${lastErrorMessage || 'AI returned an empty response. Please retry.'}`);
         }
         // Auto-save the recovered live model if it differs from the failed configured model
         if (usedModel && usedModel !== configuredModel && configuredModel !== 'auto') {
@@ -168,8 +184,6 @@ export async function tailorResume(profile, job, settings) {
             }
             catch (_) { }
         }
-        const data = await res.json();
-        rawJsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     }
     else if (settings.provider === 'groq') {
         const model = settings.model || 'llama-3.3-70b-versatile';

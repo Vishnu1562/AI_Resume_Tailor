@@ -86,6 +86,15 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
 - **Expected Results**: Tailored resume generated and parsed cleanly without surfacing JSON mode error to user.
 - **Final State**: Tailored results rendered successfully in side panel.
 
+#### NF-010: Multi-Part & Thinking Response Extraction with Empty-Candidate Cascade
+- **Preconditions**: Valid Gemini API key configured, model outputs reasoning/thought parts or returns an empty candidate (e.g. server finishReason empty).
+- **User Actions**: User clicks "Tailor Resume".
+- **System Actions**:
+  1. Iterates all content parts, ignores reasoning/thinking tokens (`thought: true`), and concatenates all text parts.
+  2. If candidate text remains empty, cascades to the next active model in Google's live catalog.
+- **Expected Results**: Complete JSON payload is reconstructed and parsed; if candidate is empty, cascade resolves on the next model.
+- **Final State**: Tailored results rendered successfully without throwing "AI returned an empty response".
+
 #### HF-003: Extract Job Details from Active Tab
 - **Preconditions**: User navigates to a job listing (e.g., on Greenhouse, Lever, Workday, or LinkedIn) and opens the extension side panel.
 - **User Actions**: Clicks "Fetch Current Job" or extension auto-detects page content.

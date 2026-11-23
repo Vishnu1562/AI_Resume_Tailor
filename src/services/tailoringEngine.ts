@@ -131,44 +131,63 @@ export async function tailorResume(
       usedModel = targetModel;
       res = await callGemini(targetModel, true);
 
-      if (res.ok) {
-        break;
+      if (!res.ok) {
+        let errData = await res.json().catch(() => ({}));
+        lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+
+        // If the model does not support JSON mode, retry without responseMimeType
+        if (
+          lastErrorMessage.toLowerCase().includes('json mode is not enabled') ||
+          lastErrorMessage.toLowerCase().includes('response_mime_type is not supported')
+        ) {
+          console.warn(`Model ${targetModel} does not support JSON mode. Retrying without responseMimeType...`);
+          res = await callGemini(targetModel, false);
+          if (!res.ok) {
+            errData = await res.json().catch(() => ({}));
+            lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+          }
+        }
       }
 
-      let errData = await res.json().catch(() => ({}));
-      lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+      // If res is ok, extract content from candidates
+      if (res && res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const candidate = data?.candidates?.[0];
+        const parts = candidate?.content?.parts || [];
+        // Filter out thought parts (thinking tokens) and take text parts
+        const nonThoughtParts = parts.filter((p: any) => !p.thought && p.text);
+        const textParts = nonThoughtParts.length > 0 ? nonThoughtParts : parts.filter((p: any) => p.text);
+        rawJsonText = textParts.map((p: any) => p.text).join('').trim();
 
-      // If the model does not support JSON mode (e.g. "JSON mode is not enabled for this model"),
-      // immediately retry without responseMimeType!
-      if (
-        lastErrorMessage.toLowerCase().includes('json mode is not enabled') ||
-        lastErrorMessage.toLowerCase().includes('response_mime_type is not supported')
-      ) {
-        console.warn(`Model ${targetModel} does not support JSON mode. Retrying without responseMimeType...`);
-        res = await callGemini(targetModel, false);
-        if (res.ok) {
+        if (rawJsonText) {
           break;
         }
-        errData = await res.json().catch(() => ({}));
-        lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+
+        const reason = candidate?.finishReason || data?.promptFeedback?.blockReason || 'Empty content';
+        lastErrorMessage = `Model ${targetModel} returned empty content (reason: ${reason})`;
+        console.warn(`${lastErrorMessage}. Cascading to next live model...`);
       }
 
-      // Check if error is high demand / capacity spike
+      // Check if error is high demand / capacity spike OR empty content
       const isHighDemandOrOverloaded =
-        res.status === 503 ||
-        lastErrorMessage.toLowerCase().includes('high demand') ||
-        lastErrorMessage.toLowerCase().includes('spikes in demand') ||
-        lastErrorMessage.toLowerCase().includes('overloaded');
+        !res.ok &&
+        (res.status === 503 ||
+          lastErrorMessage.toLowerCase().includes('high demand') ||
+          lastErrorMessage.toLowerCase().includes('spikes in demand') ||
+          lastErrorMessage.toLowerCase().includes('overloaded'));
 
       // Check if error is model deprecated / not found / unsupported method
       const isUnavailableOrNotFound =
-        res.status === 404 ||
-        lastErrorMessage.includes('no longer available') ||
-        lastErrorMessage.includes('not found') ||
-        lastErrorMessage.includes('deprecated') ||
-        lastErrorMessage.includes('not supported for generateContent');
+        !res.ok &&
+        (res.status === 404 ||
+          lastErrorMessage.includes('no longer available') ||
+          lastErrorMessage.includes('not found') ||
+          lastErrorMessage.includes('deprecated') ||
+          lastErrorMessage.includes('not supported for generateContent'));
 
-      if (isHighDemandOrOverloaded || isUnavailableOrNotFound) {
+      const isEmptyContent = res.ok && !rawJsonText;
+
+      if (isHighDemandOrOverloaded || isUnavailableOrNotFound || isEmptyContent) {
         // If we reached the end of current candidate list, query Google's live endpoint
         if (i >= candidateModels.length - 1) {
           console.warn(
@@ -192,8 +211,8 @@ export async function tailorResume(
       break;
     }
 
-    if (!res || !res.ok) {
-      throw new Error(`Gemini API Error: ${lastErrorMessage}`);
+    if (!res || !res.ok || !rawJsonText) {
+      throw new Error(`Gemini API Error: ${lastErrorMessage || 'AI returned an empty response. Please retry.'}`);
     }
 
     // Auto-save the recovered live model if it differs from the failed configured model
@@ -203,9 +222,6 @@ export async function tailorResume(
         await saveSettings({ ...settings, model: usedModel });
       } catch (_) {}
     }
-
-    const data = await res.json();
-    rawJsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   } else if (settings.provider === 'groq') {
     const model = settings.model || 'llama-3.3-70b-versatile';
     const url = 'https://api.groq.com/openai/v1/chat/completions';

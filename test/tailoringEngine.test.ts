@@ -346,4 +346,92 @@ describe('Tailoring Engine (HF-004, HF-005, NF-001, NF-004, VR-002)', () => {
     const secondReqBody = JSON.parse(mockFetch.mock.calls[1][1].body);
     expect(secondReqBody.generationConfig?.responseMimeType).toBeUndefined();
   });
+
+  it('NF-010a: handles multi-part and thinking model responses where parts[0] is thought', async () => {
+    const fakeGeminiResponse = {
+      matchScore: 94,
+      matchedSkills: ['C#', 'Angular', 'PostgreSQL'],
+      tailoredSummary: 'Summary from thinking model',
+      prioritizedSkills: { Backend: ['C#'] },
+      experience: [],
+      projects: [],
+    };
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [{
+          content: {
+            parts: [
+              { text: 'Thinking about the architecture requirements...', thought: true },
+              { text: JSON.stringify(fakeGeminiResponse) },
+            ],
+          },
+        }],
+      }),
+    });
+
+    (global as any).fetch = mockFetch;
+
+    const settings: ExtensionSettings = {
+      provider: 'gemini',
+      apiKey: 'test-key',
+      model: 'gemini-3.8-flash',
+    };
+
+    const result = await tailorResume(mockProfile, mockJob, settings);
+    expect(result.matchScore).toBe(94);
+    expect(result.tailoredSummary).toBe('Summary from thinking model');
+  });
+
+  it('NF-010b: cascades to next live model if primary model returns empty candidate content', async () => {
+    const fakeGeminiResponse = {
+      matchScore: 92,
+      matchedSkills: ['C#'],
+      tailoredSummary: 'Cascaded summary',
+      prioritizedSkills: { Backend: ['C#'] },
+      experience: [],
+      projects: [],
+    };
+
+    const mockFetch = vi
+      .fn()
+      // First call returns HTTP 200 with empty candidate
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [{ finishReason: 'OTHER' }],
+        }),
+      })
+      // Second call queries live models
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          models: [
+            { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+          ],
+        }),
+      })
+      // Third call to gemini-2.5-flash succeeds
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: JSON.stringify(fakeGeminiResponse) }] } }],
+        }),
+      });
+
+    (global as any).fetch = mockFetch;
+
+    const settings: ExtensionSettings = {
+      provider: 'gemini',
+      apiKey: 'test-key',
+      model: 'gemini-3.8-flash',
+    };
+
+    const result = await tailorResume(mockProfile, mockJob, settings);
+    expect(result.matchScore).toBe(92);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch.mock.calls[1][0]).toContain('https://generativelanguage.googleapis.com/v1beta/models?key=test-key');
+    expect(mockFetch.mock.calls[2][0]).toContain('models/gemini-2.5-flash:generateContent');
+  });
 });
