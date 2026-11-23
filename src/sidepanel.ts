@@ -685,7 +685,7 @@ function updateProviderUi(provider: 'gemini' | 'groq') {
   if (provider === 'gemini') {
     if (btnDetect) btnDetect.style.display = 'inline-block';
     if (modelTip) modelTip.textContent = 'Tip: Set to "auto" to automatically discover Google\'s latest active Flash model.';
-    if (guideTitle) guideTitle.textContent = '💡 Quick Guide: Get a free Gemini Key (30 seconds)';
+    if (guideTitle) guideTitle.textContent = '💡 Quick Guide: Get a free Gemini Key';
     if (keyInput) keyInput.placeholder = 'Paste your Google AI Studio API key';
     if (guideList) {
       guideList.innerHTML = `
@@ -698,7 +698,7 @@ function updateProviderUi(provider: 'gemini' | 'groq') {
   } else if (provider === 'groq') {
     if (btnDetect) btnDetect.style.display = 'none';
     if (modelTip) modelTip.textContent = 'Tip: Llama 3.3 70B Versatile is optimized for complex resume reasoning and ATS formatting.';
-    if (guideTitle) guideTitle.textContent = '⚡ Quick Guide: Get a free Groq Key (30 seconds)';
+    if (guideTitle) guideTitle.textContent = '⚡ Quick Guide: Get a free Groq Key';
     if (keyInput) keyInput.placeholder = 'gsk_... (Paste your Groq API key)';
     if (guideList) {
       guideList.innerHTML = `
