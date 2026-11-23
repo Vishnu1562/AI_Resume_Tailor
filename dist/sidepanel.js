@@ -626,18 +626,65 @@ function clearProfileForm() {
     });
 }
 // ------------------- TAB 3: SETTINGS -------------------
+function updateProviderUi(provider) {
+    const btnDetect = document.getElementById('btn-detect-model');
+    const modelTip = document.getElementById('model-tip');
+    const guideTitle = document.getElementById('help-guide-title');
+    const guideList = document.getElementById('help-guide-list');
+    const keyInput = document.getElementById('setting-api-key');
+    if (provider === 'gemini') {
+        if (btnDetect)
+            btnDetect.style.display = 'inline-block';
+        if (modelTip)
+            modelTip.textContent = 'Tip: Set to "auto" to automatically discover Google\'s latest active Flash model.';
+        if (guideTitle)
+            guideTitle.textContent = '💡 Quick Guide: Get a free Gemini Key (30 seconds)';
+        if (keyInput)
+            keyInput.placeholder = 'Paste your Google AI Studio API key';
+        if (guideList) {
+            guideList.innerHTML = `
+        <li>Visit <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a>.</li>
+        <li>Sign in with your Google account.</li>
+        <li>Click <strong>"Create API Key"</strong> and copy it.</li>
+        <li>Paste your key above. It includes generous free daily quota!</li>
+      `;
+        }
+    }
+    else if (provider === 'groq') {
+        if (btnDetect)
+            btnDetect.style.display = 'none';
+        if (modelTip)
+            modelTip.textContent = 'Tip: Llama 3.3 70B Versatile is optimized for complex resume reasoning and ATS formatting.';
+        if (guideTitle)
+            guideTitle.textContent = '⚡ Quick Guide: Get a free Groq Key (30 seconds)';
+        if (keyInput)
+            keyInput.placeholder = 'gsk_... (Paste your Groq API key)';
+        if (guideList) {
+            guideList.innerHTML = `
+        <li>Visit <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq Console</a>.</li>
+        <li>Sign in with your Google or GitHub account (instant & 100% free).</li>
+        <li>Click <strong>"Create API Key"</strong> and copy it (starts with <code>gsk_...</code>).</li>
+        <li>Paste your key above. Enjoy ultra-fast 500+ tokens/sec resume tailoring!</li>
+      `;
+        }
+    }
+}
 function setupSettingsTab() {
     const btnSave = document.getElementById('btn-save-settings');
     const btnDetect = document.getElementById('btn-detect-model');
     const providerSelect = document.getElementById('setting-provider');
     const modelInput = document.getElementById('setting-model');
+    // Initialize UI based on current selection
+    updateProviderUi(providerSelect?.value || 'gemini');
     providerSelect?.addEventListener('change', () => {
-        if (providerSelect.value === 'gemini') {
+        const provider = providerSelect.value;
+        if (provider === 'gemini') {
             modelInput.value = 'gemini-3.8-flash';
         }
-        else if (providerSelect.value === 'groq') {
+        else if (provider === 'groq') {
             modelInput.value = 'llama-3.3-70b-versatile';
         }
+        updateProviderUi(provider);
     });
     btnDetect?.addEventListener('click', async () => {
         const provider = providerSelect.value;
@@ -698,6 +745,7 @@ function populateSettingsForm(settings) {
         apiKeyEl.value = settings.apiKey;
     if (modelEl)
         modelEl.value = settings.model;
+    updateProviderUi(settings.provider);
 }
 function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');

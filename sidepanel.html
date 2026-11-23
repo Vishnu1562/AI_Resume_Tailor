@@ -259,7 +259,7 @@
             </button>
           </div>
           <input type="text" id="setting-model" value="gemini-3.8-flash" placeholder="auto (or e.g. gemini-3.8-flash)">
-          <span class="subtext-tip">Tip: Set to "auto" to automatically discover Google's latest active Flash model.</span>
+          <span id="model-tip" class="subtext-tip">Tip: Set to "auto" to automatically discover Google's latest active Flash model.</span>
         </div>
 
         <div class="form-group">
@@ -267,9 +267,9 @@
           <input type="password" id="setting-api-key" placeholder="Paste your API key here">
         </div>
 
-        <div class="help-box">
-          <div class="help-title">💡 Quick Guide: Get a free Gemini Key (30 seconds)</div>
-          <ol class="help-list">
+        <div id="help-guide-box" class="help-box">
+          <div id="help-guide-title" class="help-title">💡 Quick Guide: Get a free Gemini Key (30 seconds)</div>
+          <ol id="help-guide-list" class="help-list">
             <li>Visit <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a>.</li>
             <li>Sign in with your Google account.</li>
             <li>Click <strong>"Create API Key"</strong> and copy it.</li>

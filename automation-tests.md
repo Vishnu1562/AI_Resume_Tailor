@@ -54,6 +54,17 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
 - **Expected Results**: Resolves and uses the newest available Flash model automatically.
 - **Final State**: Request executes with latest valid model without hardcoded version dependency.
 
+#### HF-010: Dynamic Settings UI Adaptation by AI Provider
+- **Preconditions**: Extension settings panel open.
+- **User Actions**: User changes "AI Provider" dropdown between Google Gemini and Groq.
+- **System Actions**:
+  1. Detects selection change (`gemini` vs `groq`).
+  2. Updates Model ID default (`gemini-3.8-flash` vs `llama-3.3-70b-versatile`).
+  3. Shows/hides provider-specific controls (e.g., "Auto-Detect Latest" button and Gemini-specific tip).
+  4. Updates the step-by-step API Key Guide card to link to Google AI Studio or Groq Console with tailored instructions.
+- **Expected Results**: The UI guide, links, and model tips match the selected provider in real-time.
+- **Final State**: Active provider guide displayed accurately.
+
 #### NF-006: Deprecated Model Auto-Recovery
 - **Preconditions**: Settings configured with a model that Google has retired.
 - **User Actions**: User clicks "Tailor Resume".
