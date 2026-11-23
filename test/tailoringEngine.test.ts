@@ -192,7 +192,7 @@ describe('Tailoring Engine (HF-004, HF-005, NF-001, NF-004, VR-002)', () => {
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
-  it('NF-007: cascades to next flash model when encountering high demand (503)', async () => {
+  it('NF-007: cascades dynamically through live models from Google API when encountering high demand (503)', async () => {
     const fakeGeminiResponse = {
       matchScore: 88,
       matchedSkills: ['TypeScript', 'Node.js'],
@@ -212,7 +212,16 @@ describe('Tailoring Engine (HF-004, HF-005, NF-001, NF-004, VR-002)', () => {
           error: { message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.' },
         }),
       })
-      // Second call (cascade to gemini-2.5-flash) succeeds
+      // Second call queries Google's live models endpoint
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          models: [
+            { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+          ],
+        }),
+      })
+      // Third call executes on the live discovered model (gemini-2.5-flash) and succeeds
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -230,8 +239,62 @@ describe('Tailoring Engine (HF-004, HF-005, NF-001, NF-004, VR-002)', () => {
 
     const result = await tailorResume(mockProfile, mockJob, settings);
     expect(result.matchScore).toBe(88);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-    // Ensure the second call used gemini-2.5-flash
-    expect(mockFetch.mock.calls[1][0]).toContain('models/gemini-2.5-flash:generateContent');
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    // Verified call 2 was to live models endpoint
+    expect(mockFetch.mock.calls[1][0]).toContain('https://generativelanguage.googleapis.com/v1beta/models?key=test-key');
+    // Verified call 3 used the live discovered model
+    expect(mockFetch.mock.calls[2][0]).toContain('models/gemini-2.5-flash:generateContent');
+  });
+
+  it('NF-008: dynamically queries live models when encountering model not found (404/400)', async () => {
+    const fakeGeminiResponse = {
+      matchScore: 85,
+      matchedSkills: ['C#'],
+      tailoredSummary: 'Recovered summary',
+      prioritizedSkills: { Backend: ['C#'] },
+      experience: [],
+      projects: [],
+    };
+
+    const mockFetch = vi
+      .fn()
+      // First call fails with model not found
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({
+          error: { message: 'models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent.' },
+        }),
+      })
+      // Second call queries Google live models endpoint
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          models: [
+            { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+          ],
+        }),
+      })
+      // Third call uses live model
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: JSON.stringify(fakeGeminiResponse) }] } }],
+        }),
+      });
+
+    (global as any).fetch = mockFetch;
+
+    const settings: ExtensionSettings = {
+      provider: 'gemini',
+      apiKey: 'test-key',
+      model: 'gemini-1.5-flash',
+    };
+
+    const result = await tailorResume(mockProfile, mockJob, settings);
+    expect(result.matchScore).toBe(85);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch.mock.calls[1][0]).toContain('https://generativelanguage.googleapis.com/v1beta/models?key=test-key');
+    expect(mockFetch.mock.calls[2][0]).toContain('models/gemini-2.5-flash:generateContent');
   });
 });

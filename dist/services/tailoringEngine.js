@@ -1,4 +1,4 @@
-import { discoverLatestGeminiModel, getGeminiFlashModelCascade, FALLBACK_CASCADE, } from './geminiService.js';
+import { getGeminiFlashModelCascade, } from './geminiService.js';
 export function buildPrompt(profile, job) {
     return `You are an elite ATS Resume Optimization & Career Architecture AI.
 Your objective is to tailor the candidate's verified profile specifically for the target job description while strictly adhering to FACTUAL INTEGRITY.
@@ -70,15 +70,12 @@ export async function tailorResume(profile, job, settings) {
     let rawJsonText = '';
     if (settings.provider === 'gemini') {
         let configuredModel = settings.model || 'gemini-3.8-flash';
-        if (configuredModel === 'gemini-2.0-flash') {
-            configuredModel = 'gemini-3.8-flash';
-        }
         let candidateModels = [];
         if (configuredModel === 'auto') {
             candidateModels = await getGeminiFlashModelCascade(settings.apiKey);
         }
         else {
-            candidateModels = [configuredModel, ...FALLBACK_CASCADE.filter((m) => m !== configuredModel)];
+            candidateModels = [configuredModel];
         }
         const callGemini = async (targetModel) => {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${settings.apiKey}`;
@@ -96,47 +93,56 @@ export async function tailorResume(profile, job, settings) {
         };
         let res = null;
         let lastErrorMessage = '';
+        let usedModel = candidateModels[0];
         for (let i = 0; i < candidateModels.length; i++) {
             const targetModel = candidateModels[i];
+            usedModel = targetModel;
             res = await callGemini(targetModel);
             if (res.ok) {
                 break;
             }
             const errData = await res.json().catch(() => ({}));
             lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
-            // Check if the error indicates model deprecation / unavailability
-            const isDeprecated = lastErrorMessage.includes('no longer available') ||
-                lastErrorMessage.includes('not found') ||
-                lastErrorMessage.includes('deprecated');
-            if (isDeprecated) {
-                console.warn(`Model ${targetModel} unavailable, discovering newest Flash model...`);
-                const latestModel = await discoverLatestGeminiModel(settings.apiKey);
-                if (latestModel && latestModel !== targetModel) {
-                    res = await callGemini(latestModel);
-                    if (res.ok) {
-                        try {
-                            const { saveSettings } = await import('../storage/profileStorage.js');
-                            await saveSettings({ ...settings, model: latestModel });
-                        }
-                        catch (_) { }
-                        break;
-                    }
-                }
-            }
-            // Check if the model is experiencing high demand / capacity shedding
+            // Check if error is high demand / capacity spike
             const isHighDemandOrOverloaded = res.status === 503 ||
                 lastErrorMessage.toLowerCase().includes('high demand') ||
                 lastErrorMessage.toLowerCase().includes('spikes in demand') ||
                 lastErrorMessage.toLowerCase().includes('overloaded');
-            if (isHighDemandOrOverloaded && i < candidateModels.length - 1) {
-                console.warn(`Model ${targetModel} experiencing high demand (${lastErrorMessage}). Cascading to ${candidateModels[i + 1]}...`);
-                continue;
+            // Check if error is model deprecated / not found / unsupported method
+            const isUnavailableOrNotFound = res.status === 404 ||
+                lastErrorMessage.includes('no longer available') ||
+                lastErrorMessage.includes('not found') ||
+                lastErrorMessage.includes('deprecated') ||
+                lastErrorMessage.includes('not supported for generateContent');
+            if (isHighDemandOrOverloaded || isUnavailableOrNotFound) {
+                // If we reached the end of current candidate list, query Google's live endpoint
+                if (i >= candidateModels.length - 1) {
+                    console.warn(`Model ${targetModel} issue (${lastErrorMessage}). Querying Google AI Studio for live active models...`);
+                    const liveModels = await getGeminiFlashModelCascade(settings.apiKey);
+                    const untried = liveModels.filter((m) => !candidateModels.includes(m));
+                    if (untried.length > 0) {
+                        candidateModels.push(...untried);
+                        continue;
+                    }
+                }
+                else {
+                    console.warn(`Model ${targetModel} issue (${lastErrorMessage}). Cascading to next live model ${candidateModels[i + 1]}...`);
+                    continue;
+                }
             }
-            // If it's another non-recoverable error, break immediately
+            // If it's a non-recoverable error (e.g. invalid API key 400/403 or quota 429), break
             break;
         }
         if (!res || !res.ok) {
             throw new Error(`Gemini API Error: ${lastErrorMessage}`);
+        }
+        // Auto-save the recovered live model if it differs from the failed configured model
+        if (usedModel && usedModel !== configuredModel && configuredModel !== 'auto') {
+            try {
+                const { saveSettings } = await import('../storage/profileStorage.js');
+                await saveSettings({ ...settings, model: usedModel });
+            }
+            catch (_) { }
         }
         const data = await res.json();
         rawJsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';

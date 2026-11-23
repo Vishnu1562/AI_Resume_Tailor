@@ -55,6 +55,17 @@ describe('Gemini Model Discovery & Auto-Resolution (HF-009, NF-006, NF-007)', ()
     expect(cascade).toEqual(['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']);
   });
 
+  it('selectFlashModelCascade never injects unreturned or hardcoded models', () => {
+    const liveGoogleModels = [
+      { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-2.0-flash-exp', supportedGenerationMethods: ['generateContent'] },
+    ];
+    const cascade = selectFlashModelCascade(liveGoogleModels);
+    expect(cascade).toEqual(['gemini-2.5-flash', 'gemini-2.0-flash-exp']);
+    expect(cascade).not.toContain('gemini-1.5-flash');
+    expect(cascade).not.toContain('gemini-3.8-flash');
+  });
+
   it('getGeminiFlashModelCascade fetches and returns ordered cascade via API', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

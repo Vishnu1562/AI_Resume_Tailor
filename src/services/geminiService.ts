@@ -6,17 +6,11 @@ export interface GeminiModelInfo {
   supportedGenerationMethods?: string[];
 }
 
-export const FALLBACK_CASCADE = [
-  'gemini-3.8-flash',
-  'gemini-2.5-flash',
-  'gemini-1.5-flash',
-];
-
-export const FALLBACK_MODEL = FALLBACK_CASCADE[0];
+export const FALLBACK_MODEL = 'gemini-3.8-flash';
 
 export function selectFlashModelCascade(models: GeminiModelInfo[]): string[] {
   if (!Array.isArray(models) || models.length === 0) {
-    return [...FALLBACK_CASCADE];
+    return [FALLBACK_MODEL];
   }
 
   // Filter models that support content generation and contain 'flash'
@@ -42,7 +36,7 @@ export function selectFlashModelCascade(models: GeminiModelInfo[]): string[] {
     });
 
   if (flashModels.length === 0) {
-    return [...FALLBACK_CASCADE];
+    return [FALLBACK_MODEL];
   }
 
   // Sort descending by version number
@@ -59,20 +53,20 @@ export function selectBestFlashModel(models: GeminiModelInfo[]): string {
 
 export async function getGeminiFlashModelCascade(apiKey: string): Promise<string[]> {
   if (!apiKey || apiKey.trim() === '') {
-    return [...FALLBACK_CASCADE];
+    return [FALLBACK_MODEL];
   }
 
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
     const res = await fetch(url);
     if (!res.ok) {
-      return [...FALLBACK_CASCADE];
+      return [FALLBACK_MODEL];
     }
     const data = await res.json();
     return selectFlashModelCascade(data.models || []);
   } catch (err) {
-    console.warn('Failed to dynamically query Gemini models, falling back to static cascade:', err);
-    return [...FALLBACK_CASCADE];
+    console.warn('Failed to dynamically query Gemini models from Google API:', err);
+    return [FALLBACK_MODEL];
   }
 }
 
