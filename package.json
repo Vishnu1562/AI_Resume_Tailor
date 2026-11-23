@@ -6,7 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "tsc"
+    "build": "tsc",
+    "package": "node scripts/package.js"
   },
   "keywords": [
     "chrome-extension",
