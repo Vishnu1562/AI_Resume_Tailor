@@ -3,6 +3,7 @@ import { tailorResume } from './services/tailoringEngine.js';
 import { renderAtsHtml, formatAsMarkdown } from './services/atsPdfRenderer.js';
 import { parseResumeTextToProfile } from './services/resumeParser.js';
 import { extractTextFromPdf } from './services/pdfExtractor.js';
+import { discoverLatestGeminiModel } from './services/geminiService.js';
 // Generic dummy sample profile for demo / testing
 export const DEMO_SAMPLE_PROFILE = {
     personalInfo: {
@@ -603,6 +604,7 @@ function clearProfileForm() {
 // ------------------- TAB 3: SETTINGS -------------------
 function setupSettingsTab() {
     const btnSave = document.getElementById('btn-save-settings');
+    const btnDetect = document.getElementById('btn-detect-model');
     const providerSelect = document.getElementById('setting-provider');
     const modelInput = document.getElementById('setting-model');
     providerSelect?.addEventListener('change', () => {
@@ -611,6 +613,34 @@ function setupSettingsTab() {
         }
         else if (providerSelect.value === 'groq') {
             modelInput.value = 'llama-3.3-70b-versatile';
+        }
+    });
+    btnDetect?.addEventListener('click', async () => {
+        const provider = providerSelect.value;
+        if (provider !== 'gemini') {
+            showToast('Model auto-detection is for Google Gemini. For Groq, enter model ID manually.', 'info');
+            return;
+        }
+        const apiKey = document.getElementById('setting-api-key')?.value.trim() || '';
+        if (!apiKey) {
+            showToast('Please enter your Gemini API key first to auto-detect models.', 'error');
+            return;
+        }
+        const originalText = btnDetect.textContent;
+        btnDetect.disabled = true;
+        btnDetect.textContent = '⏳ Checking...';
+        try {
+            showToast('Querying Google AI Studio for active Flash models...', 'info');
+            const latestModel = await discoverLatestGeminiModel(apiKey);
+            modelInput.value = latestModel;
+            showToast(`Detected latest model: ${latestModel}`, 'success');
+        }
+        catch (err) {
+            showToast(`Model detection failed: ${err.message}`, 'error');
+        }
+        finally {
+            btnDetect.disabled = false;
+            btnDetect.textContent = originalText;
         }
     });
     btnSave?.addEventListener('click', async () => {

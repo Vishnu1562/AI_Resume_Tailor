@@ -203,8 +203,14 @@
         </div>
 
         <div class="form-group">
-          <label for="setting-model">Model ID</label>
-          <input type="text" id="setting-model" value="gemini-3.8-flash">
+          <div class="field-header">
+            <label for="setting-model">Model ID</label>
+            <button type="button" id="btn-detect-model" class="btn-link" title="Query Google AI Studio for the newest active Flash model">
+              ↻ Auto-Detect Latest
+            </button>
+          </div>
+          <input type="text" id="setting-model" value="gemini-3.8-flash" placeholder="auto (or e.g. gemini-3.8-flash)">
+          <span class="subtext" style="display:block; margin-top:4px;">Tip: Leave as "auto" to always dynamically use Google's latest free Flash model.</span>
         </div>
 
         <div class="form-group">

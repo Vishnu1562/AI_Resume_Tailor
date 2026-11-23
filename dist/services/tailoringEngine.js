@@ -1,3 +1,4 @@
+import { discoverLatestGeminiModel } from './geminiService.js';
 export function buildPrompt(profile, job) {
     return `You are an elite ATS Resume Optimization & Career Architecture AI.
 Your objective is to tailor the candidate's verified profile specifically for the target job description while strictly adhering to FACTUAL INTEGRITY.
@@ -69,25 +70,53 @@ export async function tailorResume(profile, job, settings) {
     let rawJsonText = '';
     if (settings.provider === 'gemini') {
         let model = settings.model || 'gemini-3.8-flash';
-        if (model === 'gemini-2.0-flash') {
+        if (model === 'auto') {
+            model = await discoverLatestGeminiModel(settings.apiKey);
+        }
+        else if (model === 'gemini-2.0-flash') {
             model = 'gemini-3.8-flash';
         }
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.apiKey}`;
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    responseMimeType: 'application/json',
-                    temperature: 0.2,
-                },
-            }),
-        });
+        const callGemini = async (targetModel) => {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${settings.apiKey}`;
+            return await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: 'application/json',
+                        temperature: 0.2,
+                    },
+                }),
+            });
+        };
+        let res = await callGemini(model);
         if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
             const message = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
-            throw new Error(`Gemini API Error: ${message}`);
+            // Check if the error indicates model deprecation / unavailability
+            const isDeprecated = message.includes('no longer available') ||
+                message.includes('not found') ||
+                message.includes('deprecated');
+            if (isDeprecated) {
+                console.warn(`Model ${model} unavailable, discovering newest Flash model...`);
+                const latestModel = await discoverLatestGeminiModel(settings.apiKey);
+                if (latestModel && latestModel !== model) {
+                    res = await callGemini(latestModel);
+                    if (res.ok) {
+                        try {
+                            const { saveSettings } = await import('../storage/profileStorage.js');
+                            await saveSettings({ ...settings, model: latestModel });
+                        }
+                        catch (_) { }
+                    }
+                }
+            }
+            if (!res.ok) {
+                const retryErr = await res.json().catch(() => ({}));
+                const finalMsg = retryErr?.error?.message || message;
+                throw new Error(`Gemini API Error: ${finalMsg}`);
+            }
         }
         const data = await res.json();
         rawJsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';

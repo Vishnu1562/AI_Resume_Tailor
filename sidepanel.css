@@ -177,6 +177,28 @@ body {
   flex: 1;
 }
 
+.field-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: #60a5fa;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 500;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+  color: #93c5fd;
+}
+
 label {
   display: block;
   font-size: 11px;

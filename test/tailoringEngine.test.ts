@@ -141,4 +141,54 @@ describe('Tailoring Engine (HF-004, HF-005, NF-001, NF-004, VR-002)', () => {
       /Quota exceeded|429/i
     );
   });
+
+  it('NF-006: automatically recovers from deprecated model error by querying latest model and retrying', async () => {
+    const fakeGeminiResponse = {
+      matchScore: 90,
+      matchedSkills: ['C#', 'Angular'],
+      tailoredSummary: 'Summary text',
+      prioritizedSkills: { Backend: ['C#'] },
+      experience: [],
+      projects: [],
+    };
+
+    const mockFetch = vi
+      .fn()
+      // First call fails with deprecation
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          error: { message: 'models/gemini-2.0-flash is no longer available. Please use gemini-3.8-flash' },
+        }),
+      })
+      // Second call queries models endpoint
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          models: [
+            { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+          ],
+        }),
+      })
+      // Third call retries with newly discovered model
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: JSON.stringify(fakeGeminiResponse) }] } }],
+        }),
+      });
+
+    (global as any).fetch = mockFetch;
+
+    const settings: ExtensionSettings = {
+      provider: 'gemini',
+      apiKey: 'test-key',
+      model: 'gemini-old-deprecated',
+    };
+
+    const result = await tailorResume(mockProfile, mockJob, settings);
+    expect(result.matchScore).toBe(90);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
 });

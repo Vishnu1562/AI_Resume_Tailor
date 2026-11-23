@@ -43,6 +43,27 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
 - **Expected Results**: Form fields are completely empty; badge turns amber ("No Profile Set"); confirmation toast appears.
 - **Final State**: Form and storage are clean and empty.
 
+#### HF-009: Dynamic Model Discovery and Auto-Resolution
+- **Preconditions**: Valid Gemini API key configured.
+- **User Actions**: User triggers tailoring with model set to "auto" (or clicks "Fetch Available Models" in Settings).
+- **System Actions**:
+  1. Queries Google AI Studio models endpoint: `GET https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`.
+  2. Filters models supporting `generateContent` containing `flash`.
+  3. Sorts versions descending to detect the newest active Flash model (e.g. `gemini-3.8-flash`).
+  4. Caches the resolved model in `chrome.storage.local` to avoid redundant network overhead.
+- **Expected Results**: Resolves and uses the newest available Flash model automatically.
+- **Final State**: Request executes with latest valid model without hardcoded version dependency.
+
+#### NF-006: Deprecated Model Auto-Recovery
+- **Preconditions**: Settings configured with a model that Google has retired.
+- **User Actions**: User clicks "Tailor Resume".
+- **System Actions**:
+  1. API request detects deprecation error response from Google.
+  2. Intercepts error, invokes dynamic model discovery to find the latest active Flash model.
+  3. Automatically updates saved settings and retries the tailoring request.
+- **Expected Results**: User request succeeds transparently without throwing a breaking error.
+- **Final State**: Model setting updated to active version and tailored resume generated.
+
 #### HF-003: Extract Job Details from Active Tab
 - **Preconditions**: User navigates to a job listing (e.g., on Greenhouse, Lever, Workday, or LinkedIn) and opens the extension side panel.
 - **User Actions**: Clicks "Fetch Current Job" or extension auto-detects page content.
