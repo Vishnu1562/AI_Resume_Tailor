@@ -297,4 +297,53 @@ describe('Tailoring Engine (HF-004, HF-005, NF-001, NF-004, VR-002)', () => {
     expect(mockFetch.mock.calls[1][0]).toContain('https://generativelanguage.googleapis.com/v1beta/models?key=test-key');
     expect(mockFetch.mock.calls[2][0]).toContain('models/gemini-2.5-flash:generateContent');
   });
+
+  it('NF-009: recovers gracefully when target model does not support JSON mode', async () => {
+    const fakeGeminiResponse = {
+      matchScore: 91,
+      matchedSkills: ['C#', 'SQL'],
+      tailoredSummary: 'Summary without JSON mode',
+      prioritizedSkills: { Backend: ['C#'] },
+      experience: [],
+      projects: [],
+    };
+
+    const mockFetch = vi
+      .fn()
+      // First call fails with "JSON mode is not enabled for this model"
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          error: { message: 'JSON mode is not enabled for this model' },
+        }),
+      })
+      // Second call retries without responseMimeType and succeeds
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [{
+            content: {
+              parts: [{ text: 'Here is the tailored resume:\n```json\n' + JSON.stringify(fakeGeminiResponse) + '\n```' }],
+            },
+          }],
+        }),
+      });
+
+    (global as any).fetch = mockFetch;
+
+    const settings: ExtensionSettings = {
+      provider: 'gemini',
+      apiKey: 'test-key',
+      model: 'gemini-3.8-flash',
+    };
+
+    const result = await tailorResume(mockProfile, mockJob, settings);
+    expect(result.matchScore).toBe(91);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    // Verify second request did not have responseMimeType
+    const secondReqBody = JSON.parse(mockFetch.mock.calls[1][1].body);
+    expect(secondReqBody.generationConfig?.responseMimeType).toBeUndefined();
+  });
 });

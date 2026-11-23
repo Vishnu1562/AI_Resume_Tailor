@@ -76,6 +76,16 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
 - **Expected Results**: Resume tailoring succeeds on a verified active model without failing with a hardcoded "model not found" error.
 - **Final State**: Tailored resume rendered successfully; active live model dynamically used.
 
+#### NF-009: JSON Mode Compatibility and Graceful Fallback
+- **Preconditions**: Valid Gemini API key configured, target model does not support `responseMimeType: 'application/json'` (returns "JSON mode is not enabled for this model").
+- **User Actions**: User clicks "Tailor Resume".
+- **System Actions**:
+  1. Intercepts error `JSON mode is not enabled for this model`.
+  2. Retries request to the model without `responseMimeType` configuration, relying on system prompt schema constraints.
+  3. Parses raw response with robust markdown fence and boundary regex extraction.
+- **Expected Results**: Tailored resume generated and parsed cleanly without surfacing JSON mode error to user.
+- **Final State**: Tailored results rendered successfully in side panel.
+
 #### HF-003: Extract Job Details from Active Tab
 - **Preconditions**: User navigates to a job listing (e.g., on Greenhouse, Lever, Workday, or LinkedIn) and opens the extension side panel.
 - **User Actions**: Clicks "Fetch Current Job" or extension auto-detects page content.

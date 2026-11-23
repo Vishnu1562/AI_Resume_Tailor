@@ -70,7 +70,15 @@ export function cleanJsonOutput(rawText: string): any {
   } else if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```\s*/, '').replace(/\s*```$/, '');
   }
-  return JSON.parse(cleaned);
+  try {
+    return JSON.parse(cleaned);
+  } catch (_) {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      return JSON.parse(match[0]);
+    }
+    throw new Error('AI returned invalid JSON format. Please retry.');
+  }
 }
 
 export async function tailorResume(
@@ -96,18 +104,21 @@ export async function tailorResume(
       candidateModels = [configuredModel];
     }
 
-    const callGemini = async (targetModel: string) => {
+    const callGemini = async (targetModel: string, useJsonMimeType: boolean = true) => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${settings.apiKey}`;
+      const body: any = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.2,
+        },
+      };
+      if (useJsonMimeType) {
+        body.generationConfig.responseMimeType = 'application/json';
+      }
       return await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.2,
-          },
-        }),
+        body: JSON.stringify(body),
       });
     };
 
@@ -118,14 +129,29 @@ export async function tailorResume(
     for (let i = 0; i < candidateModels.length; i++) {
       const targetModel = candidateModels[i];
       usedModel = targetModel;
-      res = await callGemini(targetModel);
+      res = await callGemini(targetModel, true);
 
       if (res.ok) {
         break;
       }
 
-      const errData = await res.json().catch(() => ({}));
+      let errData = await res.json().catch(() => ({}));
       lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+
+      // If the model does not support JSON mode (e.g. "JSON mode is not enabled for this model"),
+      // immediately retry without responseMimeType!
+      if (
+        lastErrorMessage.toLowerCase().includes('json mode is not enabled') ||
+        lastErrorMessage.toLowerCase().includes('response_mime_type is not supported')
+      ) {
+        console.warn(`Model ${targetModel} does not support JSON mode. Retrying without responseMimeType...`);
+        res = await callGemini(targetModel, false);
+        if (res.ok) {
+          break;
+        }
+        errData = await res.json().catch(() => ({}));
+        lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+      }
 
       // Check if error is high demand / capacity spike
       const isHighDemandOrOverloaded =
