@@ -133,7 +133,7 @@ describe('Profile Storage (HF-001, HF-002, VR-001, NF-002, RR-001)', () => {
     const settings: ExtensionSettings = {
       provider: 'gemini',
       apiKey: 'test-gemini-key-123',
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.8-flash',
     };
     await saveSettings(settings);
     const retrieved = await getSettings();

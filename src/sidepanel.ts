@@ -118,6 +118,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const settings = await getSettings();
   if (settings) {
+    // Automatically migrate deprecated model IDs
+    if (settings.model === 'gemini-2.0-flash') {
+      settings.model = 'gemini-3.8-flash';
+      await saveSettings(settings);
+    }
     populateSettingsForm(settings);
   }
 
@@ -656,7 +661,7 @@ function setupSettingsTab() {
 
   providerSelect?.addEventListener('change', () => {
     if (providerSelect.value === 'gemini') {
-      modelInput.value = 'gemini-2.0-flash';
+      modelInput.value = 'gemini-3.8-flash';
     } else if (providerSelect.value === 'groq') {
       modelInput.value = 'llama-3.3-70b-versatile';
     }
@@ -665,7 +670,11 @@ function setupSettingsTab() {
   btnSave?.addEventListener('click', async () => {
     const provider = (providerSelect.value as 'gemini' | 'groq') || 'gemini';
     const apiKey = (document.getElementById('setting-api-key') as HTMLInputElement)?.value.trim() || '';
-    const model = modelInput.value.trim() || 'gemini-2.0-flash';
+    let model = modelInput.value.trim() || 'gemini-3.8-flash';
+    if (model === 'gemini-2.0-flash') {
+      model = 'gemini-3.8-flash';
+      modelInput.value = model;
+    }
 
     if (!apiKey) {
       showToast('Please enter an API key.', 'error');

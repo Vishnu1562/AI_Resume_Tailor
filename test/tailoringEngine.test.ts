@@ -60,7 +60,7 @@ describe('Tailoring Engine (HF-004, HF-005, NF-001, NF-004, VR-002)', () => {
     const settingsWithoutKey: ExtensionSettings = {
       provider: 'gemini',
       apiKey: '',
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.8-flash',
     };
 
     await expect(tailorResume(mockProfile, mockJob, settingsWithoutKey)).rejects.toThrow(
@@ -113,7 +113,7 @@ describe('Tailoring Engine (HF-004, HF-005, NF-001, NF-004, VR-002)', () => {
     const settings: ExtensionSettings = {
       provider: 'gemini',
       apiKey: 'valid-gemini-key',
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.8-flash',
     };
 
     const result = await tailorResume(mockProfile, mockJob, settings);
@@ -134,7 +134,7 @@ describe('Tailoring Engine (HF-004, HF-005, NF-001, NF-004, VR-002)', () => {
     const settings: ExtensionSettings = {
       provider: 'gemini',
       apiKey: 'rate-limited-key',
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.8-flash',
     };
 
     await expect(tailorResume(mockProfile, mockJob, settings)).rejects.toThrow(

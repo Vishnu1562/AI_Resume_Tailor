@@ -68,7 +68,10 @@ export async function tailorResume(profile, job, settings) {
     const prompt = buildPrompt(profile, job);
     let rawJsonText = '';
     if (settings.provider === 'gemini') {
-        const model = settings.model || 'gemini-2.0-flash';
+        let model = settings.model || 'gemini-3.8-flash';
+        if (model === 'gemini-2.0-flash') {
+            model = 'gemini-3.8-flash';
+        }
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.apiKey}`;
         const res = await fetch(url, {
             method: 'POST',
