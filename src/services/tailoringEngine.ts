@@ -4,7 +4,11 @@ import type {
   ExtensionSettings,
   TailoredResume,
 } from '../types/index.js';
-import { discoverLatestGeminiModel } from './geminiService.js';
+import {
+  discoverLatestGeminiModel,
+  getGeminiFlashModelCascade,
+  FALLBACK_CASCADE,
+} from './geminiService.js';
 
 export function buildPrompt(profile: MasterProfile, job: JobContext): string {
   return `You are an elite ATS Resume Optimization & Career Architecture AI.
@@ -84,11 +88,16 @@ export async function tailorResume(
   let rawJsonText = '';
 
   if (settings.provider === 'gemini') {
-    let model = settings.model || 'gemini-3.8-flash';
-    if (model === 'auto') {
-      model = await discoverLatestGeminiModel(settings.apiKey);
-    } else if (model === 'gemini-2.0-flash') {
-      model = 'gemini-3.8-flash';
+    let configuredModel = settings.model || 'gemini-3.8-flash';
+    if (configuredModel === 'gemini-2.0-flash') {
+      configuredModel = 'gemini-3.8-flash';
+    }
+
+    let candidateModels: string[] = [];
+    if (configuredModel === 'auto') {
+      candidateModels = await getGeminiFlashModelCascade(settings.apiKey);
+    } else {
+      candidateModels = [configuredModel, ...FALLBACK_CASCADE.filter((m) => m !== configuredModel)];
     }
 
     const callGemini = async (targetModel: string) => {
@@ -106,37 +115,61 @@ export async function tailorResume(
       });
     };
 
-    let res = await callGemini(model);
+    let res: Response | null = null;
+    let lastErrorMessage = '';
 
-    if (!res.ok) {
+    for (let i = 0; i < candidateModels.length; i++) {
+      const targetModel = candidateModels[i];
+      res = await callGemini(targetModel);
+
+      if (res.ok) {
+        break;
+      }
+
       const errData = await res.json().catch(() => ({}));
-      const message = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+      lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
 
       // Check if the error indicates model deprecation / unavailability
       const isDeprecated =
-        message.includes('no longer available') ||
-        message.includes('not found') ||
-        message.includes('deprecated');
+        lastErrorMessage.includes('no longer available') ||
+        lastErrorMessage.includes('not found') ||
+        lastErrorMessage.includes('deprecated');
 
       if (isDeprecated) {
-        console.warn(`Model ${model} unavailable, discovering newest Flash model...`);
+        console.warn(`Model ${targetModel} unavailable, discovering newest Flash model...`);
         const latestModel = await discoverLatestGeminiModel(settings.apiKey);
-        if (latestModel && latestModel !== model) {
+        if (latestModel && latestModel !== targetModel) {
           res = await callGemini(latestModel);
           if (res.ok) {
             try {
               const { saveSettings } = await import('../storage/profileStorage.js');
               await saveSettings({ ...settings, model: latestModel });
             } catch (_) {}
+            break;
           }
         }
       }
 
-      if (!res.ok) {
-        const retryErr = await res.json().catch(() => ({}));
-        const finalMsg = retryErr?.error?.message || message;
-        throw new Error(`Gemini API Error: ${finalMsg}`);
+      // Check if the model is experiencing high demand / capacity shedding
+      const isHighDemandOrOverloaded =
+        res.status === 503 ||
+        lastErrorMessage.toLowerCase().includes('high demand') ||
+        lastErrorMessage.toLowerCase().includes('spikes in demand') ||
+        lastErrorMessage.toLowerCase().includes('overloaded');
+
+      if (isHighDemandOrOverloaded && i < candidateModels.length - 1) {
+        console.warn(
+          `Model ${targetModel} experiencing high demand (${lastErrorMessage}). Cascading to ${candidateModels[i + 1]}...`
+        );
+        continue;
       }
+
+      // If it's another non-recoverable error, break immediately
+      break;
+    }
+
+    if (!res || !res.ok) {
+      throw new Error(`Gemini API Error: ${lastErrorMessage}`);
     }
 
     const data = await res.json();

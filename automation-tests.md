@@ -64,6 +64,16 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
 - **Expected Results**: User request succeeds transparently without throwing a breaking error.
 - **Final State**: Model setting updated to active version and tailored resume generated.
 
+#### NF-007: Automatic Multi-Model Cascade on High Demand / 503
+- **Preconditions**: Valid Gemini API key configured, primary model under temporary server overload or high demand (HTTP 503 / "high demand").
+- **User Actions**: User clicks "Tailor Resume".
+- **System Actions**:
+  1. Detects `503` or message containing `"high demand"`.
+  2. Initiates quick retry or cascades to next best active Flash model in descending version order (e.g. `gemini-3.8-flash` -> `gemini-2.5-flash` -> `gemini-1.5-flash`).
+  3. Executes tailoring on available cascade model.
+- **Expected Results**: Resume tailoring succeeds on fallback model without surfacing a high demand error to user.
+- **Final State**: Tailored resume rendered successfully; active cascade model logged/used.
+
 #### HF-003: Extract Job Details from Active Tab
 - **Preconditions**: User navigates to a job listing (e.g., on Greenhouse, Lever, Workday, or LinkedIn) and opens the extension side panel.
 - **User Actions**: Clicks "Fetch Current Job" or extension auto-detects page content.

@@ -1,4 +1,4 @@
-import { discoverLatestGeminiModel } from './geminiService.js';
+import { discoverLatestGeminiModel, getGeminiFlashModelCascade, FALLBACK_CASCADE, } from './geminiService.js';
 export function buildPrompt(profile, job) {
     return `You are an elite ATS Resume Optimization & Career Architecture AI.
 Your objective is to tailor the candidate's verified profile specifically for the target job description while strictly adhering to FACTUAL INTEGRITY.
@@ -69,12 +69,16 @@ export async function tailorResume(profile, job, settings) {
     const prompt = buildPrompt(profile, job);
     let rawJsonText = '';
     if (settings.provider === 'gemini') {
-        let model = settings.model || 'gemini-3.8-flash';
-        if (model === 'auto') {
-            model = await discoverLatestGeminiModel(settings.apiKey);
+        let configuredModel = settings.model || 'gemini-3.8-flash';
+        if (configuredModel === 'gemini-2.0-flash') {
+            configuredModel = 'gemini-3.8-flash';
         }
-        else if (model === 'gemini-2.0-flash') {
-            model = 'gemini-3.8-flash';
+        let candidateModels = [];
+        if (configuredModel === 'auto') {
+            candidateModels = await getGeminiFlashModelCascade(settings.apiKey);
+        }
+        else {
+            candidateModels = [configuredModel, ...FALLBACK_CASCADE.filter((m) => m !== configuredModel)];
         }
         const callGemini = async (targetModel) => {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${settings.apiKey}`;
@@ -90,18 +94,24 @@ export async function tailorResume(profile, job, settings) {
                 }),
             });
         };
-        let res = await callGemini(model);
-        if (!res.ok) {
+        let res = null;
+        let lastErrorMessage = '';
+        for (let i = 0; i < candidateModels.length; i++) {
+            const targetModel = candidateModels[i];
+            res = await callGemini(targetModel);
+            if (res.ok) {
+                break;
+            }
             const errData = await res.json().catch(() => ({}));
-            const message = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+            lastErrorMessage = errData?.error?.message || `HTTP ${res.status} ${res.statusText}`;
             // Check if the error indicates model deprecation / unavailability
-            const isDeprecated = message.includes('no longer available') ||
-                message.includes('not found') ||
-                message.includes('deprecated');
+            const isDeprecated = lastErrorMessage.includes('no longer available') ||
+                lastErrorMessage.includes('not found') ||
+                lastErrorMessage.includes('deprecated');
             if (isDeprecated) {
-                console.warn(`Model ${model} unavailable, discovering newest Flash model...`);
+                console.warn(`Model ${targetModel} unavailable, discovering newest Flash model...`);
                 const latestModel = await discoverLatestGeminiModel(settings.apiKey);
-                if (latestModel && latestModel !== model) {
+                if (latestModel && latestModel !== targetModel) {
                     res = await callGemini(latestModel);
                     if (res.ok) {
                         try {
@@ -109,14 +119,24 @@ export async function tailorResume(profile, job, settings) {
                             await saveSettings({ ...settings, model: latestModel });
                         }
                         catch (_) { }
+                        break;
                     }
                 }
             }
-            if (!res.ok) {
-                const retryErr = await res.json().catch(() => ({}));
-                const finalMsg = retryErr?.error?.message || message;
-                throw new Error(`Gemini API Error: ${finalMsg}`);
+            // Check if the model is experiencing high demand / capacity shedding
+            const isHighDemandOrOverloaded = res.status === 503 ||
+                lastErrorMessage.toLowerCase().includes('high demand') ||
+                lastErrorMessage.toLowerCase().includes('spikes in demand') ||
+                lastErrorMessage.toLowerCase().includes('overloaded');
+            if (isHighDemandOrOverloaded && i < candidateModels.length - 1) {
+                console.warn(`Model ${targetModel} experiencing high demand (${lastErrorMessage}). Cascading to ${candidateModels[i + 1]}...`);
+                continue;
             }
+            // If it's another non-recoverable error, break immediately
+            break;
+        }
+        if (!res || !res.ok) {
+            throw new Error(`Gemini API Error: ${lastErrorMessage}`);
         }
         const data = await res.json();
         rawJsonText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';

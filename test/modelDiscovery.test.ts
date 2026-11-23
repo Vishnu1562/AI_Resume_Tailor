@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { discoverLatestGeminiModel, selectBestFlashModel } from '../src/services/geminiService';
+import {
+  discoverLatestGeminiModel,
+  selectBestFlashModel,
+  selectFlashModelCascade,
+  getGeminiFlashModelCascade,
+} from '../src/services/geminiService';
 
-describe('Gemini Model Discovery & Auto-Resolution (HF-009, NF-006)', () => {
+describe('Gemini Model Discovery & Auto-Resolution (HF-009, NF-006, NF-007)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -43,6 +48,22 @@ describe('Gemini Model Discovery & Auto-Resolution (HF-009, NF-006)', () => {
   it('selectBestFlashModel falls back to gemini-3.8-flash if list is empty or invalid', () => {
     expect(selectBestFlashModel([])).toBe('gemini-3.8-flash');
     expect(selectBestFlashModel(null as any)).toBe('gemini-3.8-flash');
+  });
+
+  it('selectFlashModelCascade returns descending ordered list of all active flash models', () => {
+    const cascade = selectFlashModelCascade(mockModelsList.models);
+    expect(cascade).toEqual(['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']);
+  });
+
+  it('getGeminiFlashModelCascade fetches and returns ordered cascade via API', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockModelsList,
+    });
+    (global as any).fetch = mockFetch;
+
+    const cascade = await getGeminiFlashModelCascade('valid-api-key');
+    expect(cascade).toEqual(['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']);
   });
 
   it('HF-009: discoverLatestGeminiModel fetches and resolves newest flash model via API', async () => {

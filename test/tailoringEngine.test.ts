@@ -191,4 +191,47 @@ describe('Tailoring Engine (HF-004, HF-005, NF-001, NF-004, VR-002)', () => {
     expect(result.matchScore).toBe(90);
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
+
+  it('NF-007: cascades to next flash model when encountering high demand (503)', async () => {
+    const fakeGeminiResponse = {
+      matchScore: 88,
+      matchedSkills: ['TypeScript', 'Node.js'],
+      tailoredSummary: 'Summary text from fallback model',
+      prioritizedSkills: { Backend: ['TypeScript'] },
+      experience: [],
+      projects: [],
+    };
+
+    const mockFetch = vi
+      .fn()
+      // First call (gemini-3.8-flash) fails with 503 high demand
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({
+          error: { message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.' },
+        }),
+      })
+      // Second call (cascade to gemini-2.5-flash) succeeds
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: JSON.stringify(fakeGeminiResponse) }] } }],
+        }),
+      });
+
+    (global as any).fetch = mockFetch;
+
+    const settings: ExtensionSettings = {
+      provider: 'gemini',
+      apiKey: 'test-key',
+      model: 'gemini-3.8-flash',
+    };
+
+    const result = await tailorResume(mockProfile, mockJob, settings);
+    expect(result.matchScore).toBe(88);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    // Ensure the second call used gemini-2.5-flash
+    expect(mockFetch.mock.calls[1][0]).toContain('models/gemini-2.5-flash:generateContent');
+  });
 });
