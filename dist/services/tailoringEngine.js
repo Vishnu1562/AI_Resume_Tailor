@@ -153,8 +153,15 @@ export async function tailorResume(profile, job, settings) {
                     lastErrorMessage.includes('not found') ||
                     lastErrorMessage.includes('deprecated') ||
                     lastErrorMessage.includes('not supported for generateContent'));
+            // Check if error is rate limit or per-model quota exceeded (HTTP 429)
+            const isRateLimitedOrQuotaExceeded = !res.ok &&
+                (res.status === 429 ||
+                    lastErrorMessage.toLowerCase().includes('quota exceeded') ||
+                    lastErrorMessage.toLowerCase().includes('rate-limit') ||
+                    lastErrorMessage.toLowerCase().includes('rate limit') ||
+                    lastErrorMessage.toLowerCase().includes('resource_exhausted'));
             const isEmptyContent = res.ok && !rawJsonText;
-            if (isHighDemandOrOverloaded || isUnavailableOrNotFound || isEmptyContent) {
+            if (isHighDemandOrOverloaded || isUnavailableOrNotFound || isRateLimitedOrQuotaExceeded || isEmptyContent) {
                 // If we reached the end of current candidate list, query Google's live endpoint
                 if (i >= candidateModels.length - 1) {
                     console.warn(`Model ${targetModel} issue (${lastErrorMessage}). Querying Google AI Studio for live active models...`);

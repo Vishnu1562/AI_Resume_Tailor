@@ -66,6 +66,22 @@ describe('Gemini Model Discovery & Auto-Resolution (HF-009, NF-006, NF-007)', ()
     expect(cascade).not.toContain('gemini-3.8-flash');
   });
 
+  it('HF-011: selectFlashModelCascade strictly filters out audio, TTS, image, and realtime models', () => {
+    const mixedModels = [
+      { name: 'models/gemini-3.8-flash-lite-tts', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-2.5-flash-audio', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-2.0-flash-realtime', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-2.0-flash-live', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-1.5-flash', supportedGenerationMethods: ['generateContent'] },
+    ];
+    const cascade = selectFlashModelCascade(mixedModels);
+    expect(cascade).toEqual(['gemini-3.8-flash', 'gemini-1.5-flash']);
+    expect(cascade).not.toContain('gemini-3.8-flash-lite-tts');
+    expect(cascade).not.toContain('gemini-2.5-flash-audio');
+    expect(cascade).not.toContain('gemini-2.0-flash-realtime');
+  });
+
   it('getGeminiFlashModelCascade fetches and returns ordered cascade via API', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

@@ -23,6 +23,12 @@ export function selectFlashModelCascade(models: GeminiModelInfo[]): string[] {
       return (
         name.includes('flash') &&
         supportsGen &&
+        !name.includes('tts') &&
+        !name.includes('audio') &&
+        !name.includes('image') &&
+        !name.includes('imagen') &&
+        !name.includes('live') &&
+        !name.includes('realtime') &&
         !name.includes('embedding') &&
         !name.includes('vision-preview')
       );

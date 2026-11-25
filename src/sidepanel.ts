@@ -280,6 +280,27 @@ async function fetchActiveTabJob() {
           /\bequal opportunity\b/i,
         ];
 
+        const jobPlatformHosts = ['linkedin.com', 'indeed.com', 'glassdoor.com', 'monster.com', 'ziprecruiter.com'];
+
+        const genericTitleBlacklist = [
+          /^\(?\d*\)?\s*notifications?$/i,
+          /^notifications?$/i,
+          /^search\s+results?$/i,
+          /^home$/i,
+          /^feed$/i,
+          /^single\s+position$/i,
+          /^job\s+details?$/i,
+          /^job\s+search$/i,
+          /^sign\s+in$/i,
+          /^log\s+in$/i,
+          /^view\s+all\s+jobs$/i,
+          /^careers?$/i,
+          /^jobs?$/i,
+          /^my\s+network$/i,
+          /^messaging$/i,
+        ];
+        const isGeneric = (str: string) => !str || str.trim().length < 2 || genericTitleBlacklist.some((r) => r.test(str.trim()));
+
         if (tabUrl && blockedPatterns.some((p) => p.test(tabUrl))) {
           return {
             title: '',
@@ -293,23 +314,39 @@ async function fetchActiveTabJob() {
         // 1. Company Extraction
         let company = '';
         const compEl = document.querySelector(
-          '.company-name, .topcard__flavor--black-link, [data-automation="job-company"], [data-automation*="company" i], .employer, [data-company-name="true"], [class*="company" i], [class*="employer" i]'
+          '.job-details-jobs-unified-top-card__company-name, .jobs-unified-top-card__company-name, .topcard__flavor--black-link, .topcard__flavor, a[href*="/company/"], .company-name, [data-automation="job-company"], [data-automation*="company" i], .employer, [data-company-name="true"], [class*="company-name" i], [class*="companyName" i], [class*="employer" i]'
         ) as HTMLElement;
         if (compEl && compEl.innerText?.trim()) {
-          company = compEl.innerText.trim();
+          const cand = compEl.innerText.trim();
+          if (!/^(linkedin|indeed|glassdoor)$/i.test(cand)) {
+            company = cand;
+          }
         }
 
         if (!company) {
           const ogSite = document.querySelector('meta[property="og:site_name"]')?.getAttribute('content');
-          if (ogSite?.trim()) company = ogSite.trim();
+          if (ogSite?.trim() && !/^(linkedin|indeed|glassdoor)$/i.test(ogSite.trim())) {
+            company = ogSite.trim();
+          }
         }
 
         if (!company && document.title) {
           const atMatch = document.title.match(/(?:at|@)\s+([A-Za-z0-9\s&]+?)(?:\s*[-|•–—]|$)/i);
-          if (atMatch && atMatch[1].trim().length >= 2) company = atMatch[1].trim();
+          if (atMatch && atMatch[1].trim().length >= 2 && !/^(linkedin|indeed|glassdoor)$/i.test(atMatch[1].trim())) {
+            company = atMatch[1].trim();
+          } else {
+            const cleanedTitle = document.title.replace(/^\(\d+\)\s*/, '');
+            const parts = cleanedTitle.split(/[-|•–—]/).map((p) => p.trim());
+            for (const p of parts) {
+              if (p.length >= 2 && !isGeneric(p) && !/^(linkedin|indeed|glassdoor)$/i.test(p)) {
+                company = p;
+                break;
+              }
+            }
+          }
         }
 
-        if (!company && tabUrl) {
+        if (!company && tabUrl && !jobPlatformHosts.some((h) => tabUrl.toLowerCase().includes(h))) {
           try {
             const host = new URL(tabUrl).hostname.toLowerCase();
             if (host.includes('ukg.com')) company = 'UKG';
@@ -329,22 +366,32 @@ async function fetchActiveTabJob() {
         // 2. Title Extraction
         let title = '';
         const titleEl = document.querySelector(
-          'h1.job-title, h1.topcard__title, [data-automation="job-title"], [data-automation*="title" i], [class*="job-title" i], [class*="jobTitle" i], [class*="position-title" i], h1, h2'
+          '.job-details-jobs-unified-top-card__job-title, .jobs-unified-top-card__job-title, h1.top-card-layout__title, h1.job-title, h1.topcard__title, h1.app-title, .jobsearch-JobInfoHeader-title, [data-automation="job-title"], [data-automation*="title" i], [class*="job-title" i], [class*="jobTitle" i], [class*="position-title" i], h1.t-24, h1, h2'
         ) as HTMLElement;
         if (titleEl && titleEl.innerText?.trim() && titleEl.innerText.trim().length >= 3) {
-          title = titleEl.innerText.trim();
+          const cand = titleEl.innerText.trim();
+          if (!isGeneric(cand)) {
+            title = cand;
+          }
         }
 
         if (!title && document.title) {
-          const parts = document.title.split(/[-|•–—]/);
-          if (parts[0] && parts[0].trim().length >= 3) title = parts[0].trim();
+          const cleanedTitle = document.title.replace(/^\(\d+\)\s*/, '');
+          const parts = cleanedTitle.split(/[-|•–—]/);
+          for (const p of parts) {
+            const cand = p.trim();
+            if (cand.length >= 3 && !isGeneric(cand) && !/^(linkedin|indeed|glassdoor|google|monster|ziprecruiter)$/i.test(cand)) {
+              title = cand;
+              break;
+            }
+          }
         }
 
         // 3. Description Extraction
         let description = '';
         let hasJobSelectors = false;
         const descEl = document.querySelector(
-          '.job-description, #job-details, [data-automation="job-description"], [data-automation*="description" i], [itemprop="description"], [class*="job-description" i], [class*="jobDescription" i], [id*="job-description" i], [class*="job-detail" i], article, main, [role="main"]'
+          '.jobs-description__content, .jobs-box__html-content, .jobs-description, .job-description, #job-details, [data-automation="job-description"], [data-automation*="description" i], [itemprop="description"], [class*="job-description" i], [class*="jobDescription" i], [id*="job-description" i], [class*="job-detail" i], article, main, [role="main"]'
         ) as HTMLElement;
 
         if (descEl && descEl.innerText && descEl.innerText.trim().length > 100) {

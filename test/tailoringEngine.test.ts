@@ -434,4 +434,59 @@ describe('Tailoring Engine (HF-004, HF-005, NF-001, NF-004, VR-002)', () => {
     expect(mockFetch.mock.calls[1][0]).toContain('https://generativelanguage.googleapis.com/v1beta/models?key=test-key');
     expect(mockFetch.mock.calls[2][0]).toContain('models/gemini-2.5-flash:generateContent');
   });
+
+  it('NF-012: cascades dynamically to next model when encountering per-model rate limit or quota exceeded (429)', async () => {
+    const fakeGeminiResponse = {
+      matchScore: 90,
+      matchedSkills: ['PowerApps', 'C#'],
+      tailoredSummary: 'Summary from cascaded model',
+      prioritizedSkills: { Tech: ['PowerApps'] },
+      experience: [],
+      projects: [],
+    };
+
+    const mockFetch = vi
+      .fn()
+      // First call (gemini-3.8-flash-lite-tts) fails with 429 quota exceeded
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: async () => ({
+          error: {
+            message:
+              'Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 10000, model: gemini-3.8-flash-lite-tts, description: Generate content input tokens per minute limit exceeded on Free Tier.',
+          },
+        }),
+      })
+      // Second call queries Google live models endpoint
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          models: [
+            { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+          ],
+        }),
+      })
+      // Third call to gemini-2.5-flash succeeds
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: JSON.stringify(fakeGeminiResponse) }] } }],
+        }),
+      });
+
+    (global as any).fetch = mockFetch;
+
+    const settings: ExtensionSettings = {
+      provider: 'gemini',
+      apiKey: 'test-key',
+      model: 'gemini-3.8-flash-lite-tts',
+    };
+
+    const result = await tailorResume(mockProfile, mockJob, settings);
+    expect(result.matchScore).toBe(90);
+    expect(result.tailoredSummary).toBe('Summary from cascaded model');
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch.mock.calls[2][0]).toContain('models/gemini-2.5-flash:generateContent');
+  });
 });

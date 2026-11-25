@@ -92,6 +92,38 @@ export function sanitizeJobContent(text, maxLength = 6000) {
     }
     return cleaned;
 }
+export const JOB_PLATFORM_DOMAINS = [
+    'linkedin.com',
+    'indeed.com',
+    'glassdoor.com',
+    'monster.com',
+    'ziprecruiter.com',
+    'simplyhired.com',
+    'careerbuilder.com',
+];
+export const GENERIC_TITLE_BLACKLIST = [
+    /^\(?\d*\)?\s*notifications?$/i,
+    /^notifications?$/i,
+    /^search\s+results?$/i,
+    /^home$/i,
+    /^feed$/i,
+    /^single\s+position$/i,
+    /^job\s+details?$/i,
+    /^job\s+search$/i,
+    /^sign\s+in$/i,
+    /^log\s+in$/i,
+    /^view\s+all\s+jobs$/i,
+    /^careers?$/i,
+    /^jobs?$/i,
+    /^my\s+network$/i,
+    /^messaging$/i,
+];
+export function isGenericTitle(str) {
+    const clean = str.trim();
+    if (clean.length < 2)
+        return true;
+    return GENERIC_TITLE_BLACKLIST.some((regex) => regex.test(clean));
+}
 export function extractCompanyFromUrl(url) {
     if (!url)
         return '';
@@ -102,6 +134,10 @@ export function extractCompanyFromUrl(url) {
     try {
         const parsed = new URL(url);
         const host = parsed.hostname.toLowerCase();
+        // Do not return generic job boards as the employer
+        if (JOB_PLATFORM_DOMAINS.some((d) => host.includes(d))) {
+            return '';
+        }
         // Specific ATS platform host matchers
         if (host.includes('ukg.com'))
             return 'UKG';
@@ -145,6 +181,9 @@ export function extractJobDetails(doc = document, url = '') {
     const currentUrl = url || (typeof window !== 'undefined' ? window.location?.href || '' : '');
     // 1. Job Title Extraction
     const titleSelectors = [
+        '.job-details-jobs-unified-top-card__job-title',
+        '.jobs-unified-top-card__job-title',
+        'h1.top-card-layout__title',
         'h1.job-title',
         'h1.topcard__title',
         'h1.app-title',
@@ -154,6 +193,7 @@ export function extractJobDetails(doc = document, url = '') {
         '[class*="job-title" i]',
         '[class*="jobTitle" i]',
         '[class*="position-title" i]',
+        'h1.t-24',
         'h1',
         'h2.job-title',
     ];
@@ -161,21 +201,35 @@ export function extractJobDetails(doc = document, url = '') {
     for (const sel of titleSelectors) {
         const el = doc.querySelector(sel);
         if (el && el.textContent?.trim() && el.textContent.trim().length >= 3) {
-            title = el.textContent.trim();
-            break;
+            const candidate = el.textContent.trim();
+            if (!isGenericTitle(candidate)) {
+                title = candidate;
+                break;
+            }
         }
     }
     // Fallback title from document title
     if (!title && doc.title) {
-        const titleParts = doc.title.split(/[-|•–—]/);
-        if (titleParts.length > 0 && titleParts[0].trim().length >= 3) {
-            title = titleParts[0].trim();
+        const cleanedDocTitle = doc.title.replace(/^\(\d+\)\s*/, '');
+        const titleParts = cleanedDocTitle.split(/[-|•–—]/);
+        for (const part of titleParts) {
+            const trimmed = part.trim();
+            if (trimmed.length >= 3 &&
+                !isGenericTitle(trimmed) &&
+                !/^(linkedin|indeed|glassdoor|google|monster|ziprecruiter)$/i.test(trimmed)) {
+                title = trimmed;
+                break;
+            }
         }
     }
     // 2. Company Name Extraction
     const companySelectors = [
-        '.company-name',
+        '.job-details-jobs-unified-top-card__company-name',
+        '.jobs-unified-top-card__company-name',
         '.topcard__flavor--black-link',
+        '.topcard__flavor',
+        '.company-name',
+        'a[href*="/company/"]',
         '.app-company',
         '[data-automation="job-company"]',
         '[data-automation*="company" i]',
@@ -189,22 +243,35 @@ export function extractJobDetails(doc = document, url = '') {
     for (const sel of companySelectors) {
         const el = doc.querySelector(sel);
         if (el && el.textContent?.trim()) {
-            company = el.textContent.trim();
-            break;
+            const candidate = el.textContent.trim();
+            if (!/^(linkedin|indeed|glassdoor)$/i.test(candidate)) {
+                company = candidate;
+                break;
+            }
         }
     }
     // Meta tag company checks
     if (!company) {
         const ogSite = doc.querySelector('meta[property="og:site_name"]')?.getAttribute('content');
-        if (ogSite?.trim()) {
+        if (ogSite?.trim() && !/^(linkedin|indeed|glassdoor)$/i.test(ogSite.trim())) {
             company = ogSite.trim();
         }
     }
-    // Document title company checks (e.g. "Careers at UKG")
+    // Document title company checks (e.g. "Careers at UKG" or "PowerApps Developer | Capgemini | LinkedIn")
     if (!company && doc.title) {
         const atMatch = doc.title.match(/(?:at|@)\s+([A-Za-z0-9\s&]+?)(?:\s*[-|•–—]|$)/i);
-        if (atMatch && atMatch[1].trim().length >= 2) {
+        if (atMatch && atMatch[1].trim().length >= 2 && !/^(linkedin|indeed|glassdoor)$/i.test(atMatch[1].trim())) {
             company = atMatch[1].trim();
+        }
+        else {
+            const cleanedDocTitle = doc.title.replace(/^\(\d+\)\s*/, '');
+            const titleParts = cleanedDocTitle.split(/[-|•–—]/).map((p) => p.trim());
+            for (const p of titleParts) {
+                if (p.length >= 2 && p !== title && !isGenericTitle(p) && !/^(linkedin|indeed|glassdoor)$/i.test(p)) {
+                    company = p;
+                    break;
+                }
+            }
         }
     }
     // URL fallback company check
@@ -213,6 +280,9 @@ export function extractJobDetails(doc = document, url = '') {
     }
     // 3. Job Description Extraction
     const descSelectors = [
+        '.jobs-description__content',
+        '.jobs-box__html-content',
+        '.jobs-description',
         '.job-description',
         '#job-details',
         '.description__text',
@@ -233,8 +303,9 @@ export function extractJobDetails(doc = document, url = '') {
     let rawDesc = '';
     for (const sel of descSelectors) {
         const el = doc.querySelector(sel);
-        if (el && el.innerText && el.innerText.trim().length > 100) {
-            rawDesc = el.innerText.trim();
+        const text = el?.innerText?.trim() || el?.textContent?.trim() || '';
+        if (el && text.length > 100) {
+            rawDesc = text;
             hasJobSelectors = true;
             break;
         }
@@ -245,7 +316,7 @@ export function extractJobDetails(doc = document, url = '') {
         let maxWords = 0;
         let bestBlock = '';
         containers.forEach((c) => {
-            const text = c.innerText?.trim() || '';
+            const text = c.innerText?.trim() || c.textContent?.trim() || '';
             const wordCount = text.split(/\s+/).length;
             if (wordCount > maxWords && wordCount < 5000) {
                 maxWords = wordCount;

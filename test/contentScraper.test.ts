@@ -128,4 +128,51 @@ describe('Content Scraper (HF-003, NF-003, EC-001, EC-002)', () => {
     expect(details.isDetected).toBe(true);
     expect(details.company).toBe('UKG');
   });
+
+  it('HF-012 & EC-005: extracts accurate title and company on LinkedIn, ignoring notification badges and site name', () => {
+    document.title = '(10) PowerApps Developer | Capgemini | LinkedIn';
+    document.body.innerHTML = `
+      <nav>
+        <button class="nav-btn title" title="0 notifications">0 notifications</button>
+        <a class="nav-link" title="Home">Home</a>
+        <a class="nav-link" title="My Network">My Network</a>
+      </nav>
+      <main class="jobs-search__job-details">
+        <div class="job-details-jobs-unified-top-card__container--two-pane">
+          <h1 class="job-details-jobs-unified-top-card__job-title">PowerApps Developer</h1>
+          <div class="job-details-jobs-unified-top-card__primary-description">
+            <a class="job-details-jobs-unified-top-card__company-name" href="https://www.linkedin.com/company/capgemini/">Capgemini</a>
+            <span>Bengaluru, Karnataka, India</span>
+          </div>
+        </div>
+        <article class="jobs-description__content">
+          <div id="job-details" class="jobs-box__html-content">
+            <h2>About the job</h2>
+            <p>Capgemini is hiring PowerApps Developers with 3+ years experience.</p>
+            <h3>Responsibilities:</h3>
+            <ul>
+              <li>Design, develop, and deliver Microsoft Power Platform solutions.</li>
+              <li>Develop canvas apps, model-driven apps, and Power Automate flows.</li>
+            </ul>
+            <h3>Qualifications:</h3>
+            <ul>
+              <li>Strong proficiency in PowerApps, Dataverse, and C#.</li>
+            </ul>
+          </div>
+        </article>
+        <aside class="feed-recommendations">
+          ${'<p>Sidebar recommended job links and recruiter ads</p>'.repeat(50)}
+        </aside>
+      </main>
+    `;
+
+    const details = extractJobDetails(document, 'https://www.linkedin.com/jobs/view/1234567890');
+    expect(details.isDetected).toBe(true);
+    expect(details.title).toBe('PowerApps Developer');
+    expect(details.title).not.toBe('0 notifications');
+    expect(details.company).toBe('Capgemini');
+    expect(details.company).not.toBe('Linkedin');
+    expect(details.description).toContain('Microsoft Power Platform solutions');
+    expect(details.description).not.toContain('Sidebar recommended job links');
+  });
 });

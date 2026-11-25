@@ -65,6 +65,26 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
 - **Expected Results**: The UI guide, links, and model tips match the selected provider in real-time.
 - **Final State**: Active provider guide displayed accurately.
 
+#### HF-011: Pure-Text Flash Model Discovery (TTS/Audio/Multimodal Exclusion)
+- **Preconditions**: User triggers model discovery with Google AI Studio key. Google's API returns multi-modal audio, speech, and text models.
+- **User Actions**: Trigger model discovery (or start tailoring with model set to "auto").
+- **System Actions**:
+  1. Queries Google AI Studio models endpoint.
+  2. Strictly filters out non-text models: `-tts`, `-audio`, `-image`, `-imagen`, `-live`, `-realtime`, `-embedding`.
+  3. Selects only pure-text Flash models with 250K+ TPM rate limits (e.g. `gemini-3.8-flash`, `gemini-2.5-flash`, `gemini-2.0-flash`).
+- **Expected Results**: Prevents routing to low-quota (10K TPM) audio/TTS models.
+- **Final State**: High-throughput text model selected and cached.
+
+#### HF-012: Targeted LinkedIn Job Scraping
+- **Preconditions**: User is on a LinkedIn job posting page (e.g. `linkedin.com/jobs/view/...`).
+- **User Actions**: Clicks "Scan Tab" or opens side panel.
+- **System Actions**:
+  1. Targets LinkedIn specific job title elements (`.job-details-jobs-unified-top-card__job-title`, `.jobs-unified-top-card__job-title`) while rejecting navigation badges (e.g. "0 notifications", "Home", "Feed").
+  2. Targets hiring company selector (`.job-details-jobs-unified-top-card__company-name`, `a[href*="/company/"]`) and prevents falling back to "Linkedin" as the company.
+  3. Scopes description to `.jobs-description__content` / `.jobs-description`, excluding sidebar recommendations and feed.
+- **Expected Results**: Captures accurate job title and company (e.g. "PowerApps Developer" at "Capgemini") and concise description (< 1,200 words).
+- **Final State**: Accurate job context populated in side panel.
+
 #### NF-006: Deprecated Model Auto-Recovery
 - **Preconditions**: Settings configured with a model that Google has retired.
 - **User Actions**: User clicks "Tailor Resume".
@@ -205,6 +225,16 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
 - **Expected Results**: Amber warning banner displayed, no bogus job details auto-filled.
 - **Final State**: System prevents false-positive job detection; user can navigate to a job listing or paste manually.
 
+#### NF-012: Dynamic Cascade on Per-Model Rate Limit (HTTP 429 / Quota Exceeded)
+- **Preconditions**: Primary Gemini model hits a temporary per-minute rate limit (HTTP 429 / "quota exceeded" / "input tokens per minute limit exceeded").
+- **User Actions**: User triggers resume tailoring.
+- **System Actions**:
+  1. Intercepts HTTP 429 or quota exceeded error.
+  2. Logs warning and immediately cascades to the next live Flash model in the cascade list (each model maintains independent quota in Google AI Studio).
+  3. Executes tailoring on the alternative model and updates saved settings to the working model.
+- **Expected Results**: Tailoring succeeds without throwing a blocking rate-limit error to the user.
+- **Final State**: Resume generated successfully; working model dynamically selected.
+
 ---
 
 ### Validation & Edge Cases
@@ -239,6 +269,12 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
   3. Enables user to click "Tailor Resume with AI" with manual context.
 - **Expected Results**: User can successfully tailor resume against manually provided job context even when active tab is not a job portal.
 - **Final State**: Tailoring succeeds with manual input.
+
+#### EC-005: Generic Navigation and UI Element Filtering from Job Titles
+- **Preconditions**: Webpage contains navigation items, badges, or headers with generic text (e.g., "0 notifications", "Search Results", "Job Search", "Home", "Feed", "Single Position", "Job Details").
+- **System Actions**: Content scraper evaluates extracted title against a blacklist of generic navigational patterns; ignores matching elements and continues searching for genuine role titles.
+- **Expected Results**: Prevents garbage values like "0 notifications" or "Single Position" from being populated as the role title.
+- **Final State**: Legitimate role title extracted, or sensible default "Target Role" used.
 
 #### EC-001: Extremely Long Job Posting (> 15,000 words)
 - System sanitizes and truncates extraneous boilerplate (EEO statements, cookie notices, legal disclaimers) to keep tokens focused on role responsibilities and requirements.
