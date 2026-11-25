@@ -4,6 +4,8 @@ import {
   selectBestFlashModel,
   selectFlashModelCascade,
   getGeminiFlashModelCascade,
+  formatTokenLimit,
+  getDetailedFlashModels,
 } from '../src/services/geminiService';
 
 describe('Gemini Model Discovery & Auto-Resolution (HF-009, NF-006, NF-007)', () => {
@@ -116,5 +118,50 @@ describe('Gemini Model Discovery & Auto-Resolution (HF-009, NF-006, NF-007)', ()
 
     const resolved = await discoverLatestGeminiModel('valid-api-key');
     expect(resolved).toBe('gemini-3.8-flash');
+  });
+
+  describe('Token Limit Formatting & Detailed Model Extraction (HF-013, HF-014)', () => {
+    it('formatTokenLimit formats millions, thousands, and edge cases accurately', () => {
+      expect(formatTokenLimit(1048576)).toBe('1M tokens');
+      expect(formatTokenLimit(2097152)).toBe('2M tokens');
+      expect(formatTokenLimit(131072)).toBe('128k tokens');
+      expect(formatTokenLimit(32768)).toBe('32k tokens');
+      expect(formatTokenLimit(1000000)).toBe('1M tokens');
+      expect(formatTokenLimit(undefined)).toBe('');
+      expect(formatTokenLimit(0)).toBe('');
+    });
+
+    it('getDetailedFlashModels extracts models with display names, token limits, and clean labels', () => {
+      const apiModels = [
+        {
+          name: 'models/gemini-1.5-flash',
+          displayName: 'Gemini 1.5 Flash',
+          inputTokenLimit: 1048576,
+          supportedGenerationMethods: ['generateContent'],
+        },
+        {
+          name: 'models/gemini-2.0-flash',
+          displayName: 'Gemini 2.0 Flash',
+          inputTokenLimit: 1048576,
+          supportedGenerationMethods: ['generateContent'],
+        },
+        {
+          name: 'models/gemini-3.8-flash-lite-tts',
+          displayName: 'Gemini 3.8 Flash TTS',
+          inputTokenLimit: 10000,
+          supportedGenerationMethods: ['generateContent'],
+        },
+      ];
+
+      const detailed = getDetailedFlashModels(apiModels);
+      expect(detailed).toHaveLength(2);
+      expect(detailed[0].id).toBe('gemini-2.0-flash');
+      expect(detailed[0].tokenLimitFormatted).toBe('1M tokens');
+      expect(detailed[0].label).toBe('Gemini 2.0 Flash [1M tokens]');
+
+      expect(detailed[1].id).toBe('gemini-1.5-flash');
+      expect(detailed[1].tokenLimitFormatted).toBe('1M tokens');
+      expect(detailed[1].label).toBe('Gemini 1.5 Flash [1M tokens]');
+    });
   });
 });

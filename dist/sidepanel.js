@@ -3,7 +3,7 @@ import { tailorResume } from './services/tailoringEngine.js';
 import { renderAtsHtml, formatAsMarkdown } from './services/atsPdfRenderer.js';
 import { parseResumeTextToProfile } from './services/resumeParser.js';
 import { extractTextFromPdf } from './services/pdfExtractor.js';
-import { discoverLatestGeminiModel } from './services/geminiService.js';
+import { fetchLiveGeminiModels, } from './services/geminiService.js';
 // Generic dummy sample profile for demo / testing
 export const DEMO_SAMPLE_PROFILE = {
     personalInfo: {
@@ -798,6 +798,68 @@ function clearProfileForm() {
             el.value = '';
     });
 }
+const GEMINI_DEFAULT_MODELS = [
+    { id: 'auto', displayName: 'Auto-Detect (Latest Flash • Recommended)', tokenLimitFormatted: '', label: '✨ Auto-Detect (Latest Flash • Recommended)' },
+    { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', tokenLimitFormatted: '1M tokens', label: 'Gemini 2.5 Flash [1M tokens]' },
+    { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash', tokenLimitFormatted: '1M tokens', label: 'Gemini 2.0 Flash [1M tokens]' },
+    { id: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash', tokenLimitFormatted: '1M tokens', label: 'Gemini 1.5 Flash [1M tokens]' },
+    { id: 'gemini-1.5-pro', displayName: 'Gemini 1.5 Pro', tokenLimitFormatted: '2M tokens', label: 'Gemini 1.5 Pro [2M tokens]' },
+];
+const GROQ_DEFAULT_MODELS = [
+    { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile [128k tokens]' },
+    { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant [128k tokens]' },
+    { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B [32k tokens]' },
+];
+function updateModelDropdown(provider, currentModel = 'auto', customList) {
+    const modelSelect = document.getElementById('setting-model-select');
+    const customInput = document.getElementById('setting-model-custom');
+    if (!modelSelect)
+        return;
+    modelSelect.innerHTML = '';
+    let list = [];
+    if (provider === 'gemini') {
+        if (customList && customList.length > 0) {
+            list = [
+                { id: 'auto', label: '✨ Auto-Detect (Latest Flash • Recommended)' },
+                ...customList.map((m) => ({ id: m.id, label: m.label })),
+            ];
+        }
+        else {
+            list = GEMINI_DEFAULT_MODELS.map((m) => ({ id: m.id, label: m.label }));
+        }
+    }
+    else {
+        list = GROQ_DEFAULT_MODELS;
+    }
+    list.forEach((m) => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.label;
+        modelSelect.appendChild(opt);
+    });
+    const customOpt = document.createElement('option');
+    customOpt.value = 'custom';
+    customOpt.textContent = '✏️ Enter Custom Model ID...';
+    modelSelect.appendChild(customOpt);
+    const match = list.find((m) => m.id === currentModel);
+    if (match) {
+        modelSelect.value = currentModel;
+        if (customInput)
+            customInput.style.display = 'none';
+    }
+    else if (currentModel && currentModel !== 'auto') {
+        modelSelect.value = 'custom';
+        if (customInput) {
+            customInput.style.display = 'block';
+            customInput.value = currentModel;
+        }
+    }
+    else {
+        modelSelect.value = list[0]?.id || 'auto';
+        if (customInput)
+            customInput.style.display = 'none';
+    }
+}
 // ------------------- TAB 3: SETTINGS -------------------
 function updateProviderUi(provider) {
     const btnDetect = document.getElementById('btn-detect-model');
@@ -809,7 +871,7 @@ function updateProviderUi(provider) {
         if (btnDetect)
             btnDetect.style.display = 'inline-block';
         if (modelTip)
-            modelTip.textContent = 'Tip: Set to "auto" to automatically discover Google\'s latest active Flash model.';
+            modelTip.textContent = 'Tip: Auto-Detect automatically resolves Google\'s newest high-quota text model.';
         if (guideTitle)
             guideTitle.textContent = '💡 Quick Guide: Get a free Gemini Key';
         if (keyInput)
@@ -846,41 +908,55 @@ function setupSettingsTab() {
     const btnSave = document.getElementById('btn-save-settings');
     const btnDetect = document.getElementById('btn-detect-model');
     const providerSelect = document.getElementById('setting-provider');
-    const modelInput = document.getElementById('setting-model');
+    const modelSelect = document.getElementById('setting-model-select');
+    const customInput = document.getElementById('setting-model-custom');
     // Initialize UI based on current selection
+    updateModelDropdown(providerSelect?.value || 'gemini', 'auto');
     updateProviderUi(providerSelect?.value || 'gemini');
+    modelSelect?.addEventListener('change', () => {
+        if (modelSelect.value === 'custom') {
+            if (customInput) {
+                customInput.style.display = 'block';
+                customInput.focus();
+            }
+        }
+        else {
+            if (customInput)
+                customInput.style.display = 'none';
+        }
+    });
     providerSelect?.addEventListener('change', () => {
         const provider = providerSelect.value;
-        if (provider === 'gemini') {
-            modelInput.value = 'gemini-3.8-flash';
-        }
-        else if (provider === 'groq') {
-            modelInput.value = 'llama-3.3-70b-versatile';
-        }
+        updateModelDropdown(provider, provider === 'gemini' ? 'auto' : 'llama-3.3-70b-versatile');
         updateProviderUi(provider);
     });
     btnDetect?.addEventListener('click', async () => {
         const provider = providerSelect.value;
         if (provider !== 'gemini') {
-            showToast('Model auto-detection is for Google Gemini. For Groq, enter model ID manually.', 'info');
+            showToast('Model listing is for Google Gemini. For Groq, choose from the list or enter custom ID.', 'info');
             return;
         }
         const apiKey = document.getElementById('setting-api-key')?.value.trim() || '';
         if (!apiKey) {
-            showToast('Please enter your Gemini API key first to auto-detect models.', 'error');
+            showToast('Please enter your Gemini API key first to fetch live models.', 'error');
             return;
         }
         const originalText = btnDetect.textContent;
         btnDetect.disabled = true;
-        btnDetect.textContent = '⏳ Checking...';
+        btnDetect.textContent = '⏳ Fetching...';
         try {
-            showToast('Querying Google AI Studio for active Flash models...', 'info');
-            const latestModel = await discoverLatestGeminiModel(apiKey);
-            modelInput.value = latestModel;
-            showToast(`Detected latest model: ${latestModel}`, 'success');
+            showToast('Querying Google AI Studio for active Flash models with token limits...', 'info');
+            const models = await fetchLiveGeminiModels(apiKey);
+            if (models.length > 0) {
+                updateModelDropdown('gemini', modelSelect?.value || 'auto', models);
+                showToast(`Discovered ${models.length} active models with token limits!`, 'success');
+            }
+            else {
+                showToast('No active text models returned. Default models preserved.', 'info');
+            }
         }
         catch (err) {
-            showToast(`Model detection failed: ${err.message}`, 'error');
+            showToast(`Model fetch failed: ${err.message}`, 'error');
         }
         finally {
             btnDetect.disabled = false;
@@ -890,10 +966,9 @@ function setupSettingsTab() {
     btnSave?.addEventListener('click', async () => {
         const provider = providerSelect.value || 'gemini';
         const apiKey = document.getElementById('setting-api-key')?.value.trim() || '';
-        let model = modelInput.value.trim() || 'gemini-3.8-flash';
-        if (model === 'gemini-2.0-flash') {
-            model = 'gemini-3.8-flash';
-            modelInput.value = model;
+        let model = modelSelect?.value || 'auto';
+        if (model === 'custom') {
+            model = customInput?.value.trim() || (provider === 'gemini' ? 'auto' : 'llama-3.3-70b-versatile');
         }
         if (!apiKey) {
             showToast('Please enter an API key.', 'error');
@@ -911,13 +986,11 @@ function setupSettingsTab() {
 function populateSettingsForm(settings) {
     const providerEl = document.getElementById('setting-provider');
     const apiKeyEl = document.getElementById('setting-api-key');
-    const modelEl = document.getElementById('setting-model');
     if (providerEl)
         providerEl.value = settings.provider;
     if (apiKeyEl)
         apiKeyEl.value = settings.apiKey;
-    if (modelEl)
-        modelEl.value = settings.model;
+    updateModelDropdown(settings.provider, settings.model);
     updateProviderUi(settings.provider);
 }
 function showToast(message, type = 'info') {

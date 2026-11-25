@@ -1,6 +1,6 @@
 # Package script for AI Resume Tailor Chrome Extension
 param(
-    [string]$Version = "1.0.1"
+    [string]$Version = "1.0.2"
 )
 
 $ErrorActionPreference = "Stop"
