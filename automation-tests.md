@@ -85,38 +85,38 @@ AI Resume Tailor is a privacy-first, client-side Manifest V3 Chrome Extension op
 - **Expected Results**: Captures accurate job title and company (e.g. "PowerApps Developer" at "Capgemini") and concise description (< 1,200 words).
 - **Final State**: Accurate job context populated in side panel.
 
-#### HF-013: Model Dropdown Selection with Formatted Token Limits
+#### HF-013: Professional Model Dropdown Selection with Formatted Token Limits
 - **Preconditions**: Settings tab open.
 - **User Actions**: User views the Model selector.
 - **System Actions**:
   1. Renders a `<select>` dropdown populated with models and formatted token limits in brackets (e.g. `Gemini 1.5 Flash [1M tokens]`, `Llama 3.3 70B [128k tokens]`).
-  2. Defaults to `Auto-Detect (Latest Flash • Recommended)`.
-  3. Provides an option for `✏️ Enter Custom Model ID...`.
-- **Expected Results**: User can select any model from the dropdown with visible token capacity.
+  2. Clean professional typography without emoji prefixes: defaults to `Auto-Detect (Recommended)`.
+  3. Provides a clean fallback option: `Custom Model...`.
+- **Expected Results**: User can select any model from the dropdown with visible token capacity and no emoji clutter.
 - **Final State**: Selected model saved in `chrome.storage.local`.
 
 #### HF-014: Live Model Fetch and Dropdown Repopulation
 - **Preconditions**: Valid Gemini API key entered in Settings.
-- **User Actions**: User clicks "⟳ Fetch Live Models" button.
+- **User Actions**: User clicks "Fetch Live Models" button.
 - **System Actions**:
   1. Queries Google AI Studio models endpoint: `GET https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`.
   2. Filters out audio/TTS/multimodal models and extracts `displayName`, `name`, and `inputTokenLimit`.
   3. Formats token numbers into human-readable strings (`1048576` -> `1M tokens`, `131072` -> `128k tokens`).
-  4. Repopulates the dropdown with live active models sorted descending by version.
+  4. Repopulates the dropdown with live active models sorted descending by version, prefixed with clean `Auto-Detect (Recommended)`.
   5. Displays confirmation toast with total count of models retrieved.
 - **Expected Results**: Dropdown updates in real-time with verified live models and their exact token limits.
 - **Final State**: Updated models available for selection.
 
 #### HF-015: Custom Model Entry Fallback
 - **Preconditions**: Settings tab open.
-- **User Actions**: User chooses "✏️ Enter Custom Model ID..." from the model dropdown.
+- **User Actions**: User chooses "Custom Model..." from the model dropdown.
 - **System Actions**: Reveals a text input allowing manual entry of a custom model string (e.g. fine-tuned model or private endpoint).
 - **Expected Results**: Custom model text field appears; on saving settings, the custom string is stored.
 - **Final State**: Custom model ID stored and used for tailoring.
 
 #### NF-013: Fetch Live Models Without API Key
 - **Preconditions**: No API key entered in Settings.
-- **User Actions**: User clicks "⟳ Fetch Live Models".
+- **User Actions**: User clicks "Fetch Live Models".
 - **System Actions**: Intercepts missing key, prevents network call, and displays notification: "Please enter your API key first to fetch live models."
 - **Expected Results**: Existing default model options preserved; clear warning shown.
 - **Final State**: State remains stable.

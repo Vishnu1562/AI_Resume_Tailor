@@ -6,6 +6,10 @@ import {
   getGeminiFlashModelCascade,
   formatTokenLimit,
   getDetailedFlashModels,
+  DEFAULT_AUTO_MODEL_LABEL,
+  CUSTOM_MODEL_LABEL,
+  GEMINI_DEFAULT_MODELS,
+  GROQ_DEFAULT_MODELS,
 } from '../src/services/geminiService';
 
 describe('Gemini Model Discovery & Auto-Resolution (HF-009, NF-006, NF-007)', () => {
@@ -162,6 +166,29 @@ describe('Gemini Model Discovery & Auto-Resolution (HF-009, NF-006, NF-007)', ()
       expect(detailed[1].id).toBe('gemini-1.5-flash');
       expect(detailed[1].tokenLimitFormatted).toBe('1M tokens');
       expect(detailed[1].label).toBe('Gemini 1.5 Flash [1M tokens]');
+    });
+
+    it('GEMINI_DEFAULT_MODELS and GROQ_DEFAULT_MODELS contain clean, emoji-free professional labels (HF-013)', () => {
+      // Emojis regex to ensure zero consumer emojis in dropdown options
+      const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+
+      expect(DEFAULT_AUTO_MODEL_LABEL).toBe('Auto-Detect (Recommended)');
+      expect(emojiRegex.test(DEFAULT_AUTO_MODEL_LABEL)).toBe(false);
+
+      expect(CUSTOM_MODEL_LABEL).toBe('Custom Model...');
+      expect(emojiRegex.test(CUSTOM_MODEL_LABEL)).toBe(false);
+
+      for (const m of GEMINI_DEFAULT_MODELS) {
+        expect(emojiRegex.test(m.label)).toBe(false);
+        expect(m.label).not.toContain('✨');
+        expect(m.label).not.toContain('✏️');
+      }
+
+      for (const m of GROQ_DEFAULT_MODELS) {
+        expect(emojiRegex.test(m.label)).toBe(false);
+        expect(m.label).not.toContain('✨');
+        expect(m.label).not.toContain('✏️');
+      }
     });
   });
 });

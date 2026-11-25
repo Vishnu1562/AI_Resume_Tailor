@@ -16,6 +16,23 @@ export interface DetailedModelItem {
   label: string;
 }
 
+export const DEFAULT_AUTO_MODEL_LABEL = 'Auto-Detect (Recommended)';
+export const CUSTOM_MODEL_LABEL = 'Custom Model...';
+
+export const GEMINI_DEFAULT_MODELS: DetailedModelItem[] = [
+  { id: 'auto', displayName: 'Auto-Detect (Recommended)', tokenLimitFormatted: '', label: DEFAULT_AUTO_MODEL_LABEL },
+  { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', tokenLimitFormatted: '1M tokens', label: 'Gemini 2.5 Flash [1M tokens]' },
+  { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash', tokenLimitFormatted: '1M tokens', label: 'Gemini 2.0 Flash [1M tokens]' },
+  { id: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash', tokenLimitFormatted: '1M tokens', label: 'Gemini 1.5 Flash [1M tokens]' },
+  { id: 'gemini-1.5-pro', displayName: 'Gemini 1.5 Pro', tokenLimitFormatted: '2M tokens', label: 'Gemini 1.5 Pro [2M tokens]' },
+];
+
+export const GROQ_DEFAULT_MODELS = [
+  { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile [128k tokens]' },
+  { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant [128k tokens]' },
+  { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B [32k tokens]' },
+];
+
 export const FALLBACK_MODEL = 'gemini-3.8-flash';
 
 export function formatTokenLimit(tokens?: number): string {

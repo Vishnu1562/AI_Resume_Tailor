@@ -1,6 +1,6 @@
 {
   "name": "ai-resume-tailor",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Chrome Extension to analyze job postings and generate ATS-tailored resumes using free AI models.",
   "type": "module",
   "scripts": {

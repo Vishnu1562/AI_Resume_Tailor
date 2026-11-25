@@ -14,6 +14,10 @@ import {
   discoverLatestGeminiModel,
   fetchLiveGeminiModels,
   type DetailedModelItem,
+  DEFAULT_AUTO_MODEL_LABEL,
+  CUSTOM_MODEL_LABEL,
+  GEMINI_DEFAULT_MODELS,
+  GROQ_DEFAULT_MODELS,
 } from './services/geminiService.js';
 import type { MasterProfile, ExtensionSettings, JobContext, TailoredResume } from './types/index.js';
 
@@ -858,20 +862,6 @@ function clearProfileForm() {
   });
 }
 
-const GEMINI_DEFAULT_MODELS: DetailedModelItem[] = [
-  { id: 'auto', displayName: 'Auto-Detect (Latest Flash • Recommended)', tokenLimitFormatted: '', label: '✨ Auto-Detect (Latest Flash • Recommended)' },
-  { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', tokenLimitFormatted: '1M tokens', label: 'Gemini 2.5 Flash [1M tokens]' },
-  { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash', tokenLimitFormatted: '1M tokens', label: 'Gemini 2.0 Flash [1M tokens]' },
-  { id: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash', tokenLimitFormatted: '1M tokens', label: 'Gemini 1.5 Flash [1M tokens]' },
-  { id: 'gemini-1.5-pro', displayName: 'Gemini 1.5 Pro', tokenLimitFormatted: '2M tokens', label: 'Gemini 1.5 Pro [2M tokens]' },
-];
-
-const GROQ_DEFAULT_MODELS = [
-  { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile [128k tokens]' },
-  { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant [128k tokens]' },
-  { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B [32k tokens]' },
-];
-
 function updateModelDropdown(provider: 'gemini' | 'groq', currentModel: string = 'auto', customList?: DetailedModelItem[]) {
   const modelSelect = document.getElementById('setting-model-select') as HTMLSelectElement;
   const customInput = document.getElementById('setting-model-custom') as HTMLInputElement;
@@ -883,7 +873,7 @@ function updateModelDropdown(provider: 'gemini' | 'groq', currentModel: string =
   if (provider === 'gemini') {
     if (customList && customList.length > 0) {
       list = [
-        { id: 'auto', label: '✨ Auto-Detect (Latest Flash • Recommended)' },
+        { id: 'auto', label: DEFAULT_AUTO_MODEL_LABEL },
         ...customList.map((m) => ({ id: m.id, label: m.label })),
       ];
     } else {
@@ -902,7 +892,7 @@ function updateModelDropdown(provider: 'gemini' | 'groq', currentModel: string =
 
   const customOpt = document.createElement('option');
   customOpt.value = 'custom';
-  customOpt.textContent = '✏️ Enter Custom Model ID...';
+  customOpt.textContent = CUSTOM_MODEL_LABEL;
   modelSelect.appendChild(customOpt);
 
   const match = list.find((m) => m.id === currentModel);
@@ -1000,7 +990,7 @@ function setupSettingsTab() {
 
     const originalText = btnDetect.textContent;
     btnDetect.disabled = true;
-    btnDetect.textContent = '⏳ Fetching...';
+    btnDetect.textContent = 'Fetching...';
     try {
       showToast('Querying Google AI Studio for active Flash models with token limits...', 'info');
       const models = await fetchLiveGeminiModels(apiKey);

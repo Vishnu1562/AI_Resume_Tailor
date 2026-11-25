@@ -255,15 +255,15 @@
           <div class="field-header">
             <label for="setting-model-select">Model Selection</label>
             <button type="button" id="btn-detect-model" class="btn-link" title="Query API for active models and token limits">
-              ↻ Fetch Live Models
+              Fetch Live Models
             </button>
           </div>
           <select id="setting-model-select">
-            <option value="auto">✨ Auto-Detect (Latest Flash • Recommended)</option>
+            <option value="auto">Auto-Detect (Recommended)</option>
             <option value="gemini-2.5-flash">Gemini 2.5 Flash [1M tokens]</option>
             <option value="gemini-2.0-flash">Gemini 2.0 Flash [1M tokens]</option>
             <option value="gemini-1.5-flash">Gemini 1.5 Flash [1M tokens]</option>
-            <option value="custom">✏️ Enter Custom Model ID...</option>
+            <option value="custom">Custom Model...</option>
           </select>
           <input type="text" id="setting-model-custom" style="display: none; margin-top: 6px;" placeholder="e.g. gemini-2.5-flash">
           <span id="model-tip" class="subtext-tip">Tip: Auto-Detect automatically resolves Google's newest high-quota text model.</span>
